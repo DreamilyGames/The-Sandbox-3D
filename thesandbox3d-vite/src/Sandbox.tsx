@@ -1,11 +1,13 @@
 import React, { useRef, useState, Component, Suspense } from 'react'
 
 import * as THREE from 'three'
-import { OrbitControls, Html, useProgress } from '@react-three/drei';
-import { Canvas, useFrame, useThree, useLoader, type ThreeElements } from '@react-three/fiber'
+import { OrbitControls, Html, useProgress, Grid, PivotControls } from '@react-three/drei'
+import { Canvas, useFrame, useThree, useLoader, type ThreeElements
+ } from '@react-three/fiber'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import './index.css'
 import './Sandbox.css'
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 
 function Box(props: ThreeElements['mesh']) {
     const meshRef = useRef<THREE.Mesh>(null!)
@@ -27,23 +29,34 @@ onPointerOut = {(event) => setHover(false)}>
 )
 }
 
-function Bike()
+function Bike({ camCtrlRef }: { camCtrlRef: React.RefObject<OrbitControlsImpl | null> })
 {
     const gltf = useLoader(GLTFLoader, 
         '/models/motorcycles/BMW/S1000 RR/scene.gltf')
-    return <primitive object={gltf.scene} scale = {4} />
+    return (
+        <PivotControls scale={4} 
+        onDragStart={() => 
+        {
+            if(camCtrlRef.current)
+            {
+                camCtrlRef.current.enabled = false
+            }
+        }}
+        onDragEnd={() => 
+        {
+            if(camCtrlRef.current)
+            {
+                camCtrlRef.current.enabled = true
+            }
+        }}>
+            <primitive object={gltf.scene} scale = {4} />
+        </PivotControls>
+    )
 }
 
 function Loader() {
   const { progress } = useProgress()
-  return <Html center className="text-white font-mono">{progress.toFixed(0)}% loaded</Html>
-}
-
-function PrintCameraStats()
-{
-    const { camera } = useThree()
-    return (<></>
-    )
+  return (<Html center className="text-white font-mono">{progress.toFixed(0)}% loaded</Html>)
 }
 
 function FastCameraLogger({ textRef }: { textRef: React.RefObject<HTMLHeadingElement|null> }) {
@@ -64,11 +77,12 @@ function FastCameraLogger({ textRef }: { textRef: React.RefObject<HTMLHeadingEle
 export default function Sandbox() {
 
     const cameraTextRef = useRef<HTMLHeadingElement>(null)
+    const controlsRef = useRef<OrbitControlsImpl>(null)
 
     return (
         <>
         <div className="canvas-container">
-        <Canvas>
+        <Canvas camera = {{ fov: 50, position: [10.3, 3.9, 3.7] }}>
             <ambientLight intensity= { Math.PI / 2 } />
 
             <spotLight position = { [10, 10, 10] } angle = { 0.15} 
@@ -77,15 +91,28 @@ export default function Sandbox() {
             <pointLight position={ [-10, -10, -10] } decay = { 0} 
             intensity = { Math.PI } />
 
+            <Grid
+                position={[0, -0.01, 0]}      // Slightly below origin to prevent z-fighting
+                args={[10.5, 10.5]}           // Plane dimensions
+                cellSize={0.6}                // Primary cell size
+                cellThickness={1}             // Primary line thickness
+                cellColor="#64748b"           // Color of main grid lines
+                sectionSize={6.6}             // Major section line spacing
+                sectionThickness={1.5}        // Major section line thickness
+                sectionColor="#38bdf8"         // Color of major section lines
+                fadeDistance={50}             // How far the grid extends before fading out
+                fadeStrength={1}              // Fadeout dropoff strength
+                infiniteGrid                  // Extends grid endlessly
+            />
+
             <Box position={[-1.2, 0, 0]} />
             <Box position={[1.2, 0, 0]} />
 
             <Suspense fallback={<Loader />}>
-                <Bike />
+                <Bike camCtrlRef={controlsRef}/>
             </Suspense>
-            
 
-            <OrbitControls/>
+            <OrbitControls ref={controlsRef}/>
 
             <FastCameraLogger textRef={cameraTextRef} />
         </Canvas>
