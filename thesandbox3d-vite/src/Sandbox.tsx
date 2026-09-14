@@ -1,7 +1,7 @@
-import React, { useRef, useState, Component } from 'react'
+import React, { useRef, useState, Component, Suspense } from 'react'
 
 import * as THREE from 'three'
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, Html, useProgress } from '@react-three/drei';
 import { Canvas, useFrame, useThree, useLoader, type ThreeElements } from '@react-three/fiber'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import './index.css'
@@ -32,6 +32,11 @@ function Bike()
     const gltf = useLoader(GLTFLoader, 
         '/res/models/motorcycles/BMW/S1000 RR/scene.gltf')
     return <primitive object={gltf.scene} scale = {4} />
+}
+
+function Loader() {
+  const { progress } = useProgress()
+  return <Html center className="text-white font-mono">{progress.toFixed(0)}% loaded</Html>
 }
 
 function PrintCameraStats()
@@ -74,7 +79,11 @@ export default function Sandbox() {
 
             <Box position={[-1.2, 0, 0]} />
             <Box position={[1.2, 0, 0]} />
-            <Bike />
+
+            <Suspense fallback={<Loader />}>
+                <Bike />
+            </Suspense>
+            
 
             <OrbitControls/>
 
