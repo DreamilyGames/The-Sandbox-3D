@@ -30,7 +30,7 @@ onPointerOut = {(event) => setHover(false)}>
 function Bike()
 {
     const gltf = useLoader(GLTFLoader, 
-        '/thesandbox3d-vite/res/models/motorcycles/BMW/S1000 RR/scene.gltf')
+        '/models/motorcycles/BMW/S1000 RR/scene.gltf')
     return <primitive object={gltf.scene} scale = {4} />
 }
 
