@@ -2,7 +2,7 @@ import heroImg from './assets/hero.png'
 import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
 import './App.css'
-import './Sandbox'
+import './SBSandbox'
 
 import React, { useRef, useState, Component } from 'react'
 

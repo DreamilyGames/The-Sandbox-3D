@@ -2,11 +2,12 @@ import React, { useRef, useState, Component, Suspense } from 'react'
 
 import * as THREE from 'three'
 import { OrbitControls, Html, useProgress, Grid, PivotControls } from '@react-three/drei'
-import { Canvas, useFrame, useThree, useLoader, type ThreeElements
+import { Canvas, useFrame, useThree, useLoader, type ThreeElements, type ThreeEvent
  } from '@react-three/fiber'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import './index.css'
-import './Sandbox.css'
+import './SBSandbox.css'
+import {SBModel} from './Renderer/Model/SBModel'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 
 function Box(props: ThreeElements['mesh']) {
@@ -23,7 +24,7 @@ function Box(props: ThreeElements['mesh']) {
 }
 onPointerOver = {(event) => setHover(true)}
 onPointerOut = {(event) => setHover(false)}>
-    <boxGeometry args={ [1, 1, 1] } />
+    <boxGeometry args={ [0.5, 0.5, 0.5] } />
         < meshStandardMaterial color = { hovered? 'hotpink': '#2f74c0' } />
             </mesh>
 )
@@ -31,26 +32,10 @@ onPointerOut = {(event) => setHover(false)}>
 
 function Bike({ camCtrlRef }: { camCtrlRef: React.RefObject<OrbitControlsImpl | null> })
 {
-    const gltf = useLoader(GLTFLoader, 
-        '/models/motorcycles/BMW/S1000 RR/scene.gltf')
     return (
-        <PivotControls scale={4} 
-        onDragStart={() => 
-        {
-            if(camCtrlRef.current)
-            {
-                camCtrlRef.current.enabled = false
-            }
-        }}
-        onDragEnd={() => 
-        {
-            if(camCtrlRef.current)
-            {
-                camCtrlRef.current.enabled = true
-            }
-        }}>
-            <primitive object={gltf.scene} scale = {4} />
-        </PivotControls>
+        <SBModel withPivotCtrls = {false} 
+        modelPath = {'/models/motorcycles/BMW/S1000 RR/scene.gltf'} 
+        camCtrlRef = {camCtrlRef}/>
     )
 }
 
@@ -82,7 +67,7 @@ export default function Sandbox() {
     return (
         <>
         <div className="canvas-container">
-        <Canvas camera = {{ fov: 50, position: [10.3, 3.9, 3.7] }}>
+        <Canvas camera = {{ fov: 50, position: [2.14, 1.27, 1.78] }}>
             <ambientLight intensity= { Math.PI / 2 } />
 
             <spotLight position = { [10, 10, 10] } angle = { 0.15} 
@@ -94,11 +79,11 @@ export default function Sandbox() {
             <Grid
                 position={[0, -0.01, 0]}      // Slightly below origin to prevent z-fighting
                 args={[10.5, 10.5]}           // Plane dimensions
-                cellSize={0.6}                // Primary cell size
+                cellSize={0.4}                // Primary cell size
                 cellThickness={1}             // Primary line thickness
                 cellColor="#64748b"           // Color of main grid lines
-                sectionSize={6.6}             // Major section line spacing
-                sectionThickness={1.5}        // Major section line thickness
+                sectionSize={4.0}             // Major section line spacing
+                sectionThickness={1.2}        // Major section line thickness
                 sectionColor="#38bdf8"         // Color of major section lines
                 fadeDistance={50}             // How far the grid extends before fading out
                 fadeStrength={1}              // Fadeout dropoff strength
