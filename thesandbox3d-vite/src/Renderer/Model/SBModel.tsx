@@ -1,20 +1,29 @@
 import { PivotControls, useGLTF } from '@react-three/drei'
-import  { useLoader, type ThreeEvent } from '@react-three/fiber'
+import  { useFrame, useLoader, type ThreeElements, type ThreeEvent } from '@react-three/fiber'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-import { SimplifyModifier, type OrbitControls as OrbitControlsImpl } from 'three-stdlib'
+import { type OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { MeshoptSimplifier } from 'meshoptimizer'
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three'
+import { easing } from 'maath'
+import '../../World/SBWorld'
+
+interface SimplifiedModelProps extends React.ComponentPropsWithoutRef<'primitive'> 
+{
+  modelScene: THREE.Group
+  vertRetain: number
+}
 
 /**
  * Simplifies a 3D model by reducing its vertex count and applying flat shading.
- * @param modelPath - The path to the 3D model file (GLTF format).
+ * @param modelScene - The 3D model scene to simplify.
  * @param vertRetain - The percentage of vertices to retain (between 0 and 1). 
  * @returns 
  */
-function SimplifyModel({ modelPath, vertRetain }: { modelPath: string, vertRetain: number }) 
+function SimplifiedModel({ modelScene, vertRetain, ...props }: 
+    SimplifiedModelProps) 
 {
-  const { scene } = useGLTF(modelPath);
+  const scene = modelScene.clone();
 
   const lowPolyScene = useMemo(() => 
   {
@@ -88,16 +97,79 @@ function SimplifyModel({ modelPath, vertRetain }: { modelPath: string, vertRetai
   }, 
   [scene]);
 
-  return <primitive object={lowPolyScene} />;
+  return <primitive {...props} object={lowPolyScene}  />;
 }
 
-export function SBModel({withPivotCtrls, modelPath, camCtrlRef}: 
-    
+// Simple custom shader to create an inverted shell outline
+const InvertedHullMaterial = {
+  uniforms: {
+    uOutlineColor: { value: new THREE.Color('cyan') },
+    uOutlineAlpha: { value: 0 }, // Animated alpha
+  },
+  vertexShader: `
+    const float cOutlineWidth = 0.01; // Default thickness
+    void main() {
+      // Scale vertex outward based on normal direction
+      vec3 newPosition = position + normal * cOutlineWidth;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform vec3 uOutlineColor;
+    uniform float uOutlineAlpha;
+    void main() {
+      gl_FragColor = vec4(uOutlineColor * uOutlineAlpha, uOutlineAlpha);
+    }
+  `,
+  side: THREE.BackSide, // Render only inner faces
+  transparent: true,  // REQUIRED for smooth alpha fading
+  depthWrite: false,   // Prevents alpha z-buffer clipping artifacts
+};
+
+export function SBModel({withPivotCtrls, modelPath, camCtrlRef, camRotatingFlag}: 
     { withPivotCtrls: boolean, 
     modelPath: string, 
-    camCtrlRef: React.RefObject<OrbitControlsImpl | null> })
+    camCtrlRef: React.RefObject<OrbitControlsImpl | null>, 
+    camRotatingFlag: boolean })
 {
-    const gltf = useLoader(GLTFLoader, modelPath)
+    const gltf = useGLTF(modelPath)
+    const [isHovered, setHovered] = useState(false)
+    const uOutlineAlphaRef = useRef({ value: 0 }); // Initial alpha
+    
+    const outlineMaterial = useMemo(() => 
+        new THREE.ShaderMaterial(InvertedHullMaterial), []);
+
+    const gltfScene2 = useMemo(() => 
+        gltf.scene.clone(), [gltf.scene]);
+
+    useFrame((state, delta) => 
+    {
+        const targetAlpha = isHovered ? 1.0 : 0.0; // Scale factor, not pixel width
+
+        easing.damp(
+        uOutlineAlphaRef.current,
+        'value',
+        targetAlpha,
+        0.03, // Faster growth speed
+        delta
+        );
+
+        // Apply mutated uniform
+        outlineMaterial.uniforms.uOutlineAlpha.value = uOutlineAlphaRef.current.value;
+    });
+
+    useEffect(() => 
+    {
+        gltfScene2.traverse((child ) =>
+        {
+            const mesh = child as THREE.Mesh;
+            if (mesh.isMesh) 
+            {
+                // Replace or modify the material
+                mesh.material = outlineMaterial
+            }
+        })
+    }, [gltfScene2])
 
     return(
         <>
@@ -118,20 +190,40 @@ export function SBModel({withPivotCtrls, modelPath, camCtrlRef}:
                 }
             }}>
                 <group>
+                    {/* We will use this to create a low-poly hitbox for the model for cursor
+                        detection in the future. */
+                    <SimplifiedModel modelScene={gltf.scene} vertRetain={0.1} 
+                        onPointerOver = 
+                        {(e: ThreeEvent<MouseEvent>) => 
+                        {
+                            if(!camRotatingFlag)
+                            setHovered(true)
+                        }}
+                        onPointerOut = 
+                        {
+                            (e: ThreeEvent<MouseEvent>) => setHovered(false)
+                        }
+                        onClick = {(e: ThreeEvent<MouseEvent>) =>
+                        {
+                            e.stopPropagation()
+                            
+                        }}
+                        visible = {false}
+                    />
+                    }
                     
-                    <SimplifyModel modelPath={modelPath} vertRetain={0.1} />
 
                     {/* The original (complex) model for display */}
                     <group dispose={null} raycast={() => null}>
                         <primitive object={gltf.scene}
-                        onClick = {(e: ThreeEvent<MouseEvent>) =>
-                        {
-                            e.stopPropagation()
+                        
+                        
+                        visible = {true}
+                        >
+                        </primitive>
 
-                        }}
-                        visible = {false}
-                        raycast={() => null}
-                        />
+                        
+                        <primitive object={gltfScene2}/>
                     </group>
                 </group>
                 

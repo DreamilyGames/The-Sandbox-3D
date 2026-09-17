@@ -1,4 +1,4 @@
-import React, { useRef, useState, Component, Suspense } from 'react'
+import React, { useRef, useState, Component, Suspense, type Dispatch, type SetStateAction } from 'react'
 
 import * as THREE from 'three'
 import { OrbitControls, Html, useProgress, Grid, PivotControls } from '@react-three/drei'
@@ -10,32 +10,43 @@ import './SBSandbox.css'
 import {SBModel} from './Renderer/Model/SBModel'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 
-function Box(props: ThreeElements['mesh']) {
+function Box(props: ThreeElements['mesh']) 
+{
     const meshRef = useRef<THREE.Mesh>(null!)
     const [hovered, setHover] = useState(false)
     const [active, setActive] = useState(false)
     useFrame((state, delta) => (meshRef.current.rotation.x += delta))
+
     return (
-        <mesh
-    { ...props }
-    ref = { meshRef }
-    scale = { active? 1.5: 1 }
-    onClick = {(event) => setActive(!active)
-}
-onPointerOver = {(event) => setHover(true)}
-onPointerOut = {(event) => setHover(false)}>
-    <boxGeometry args={ [0.5, 0.5, 0.5] } />
-        < meshStandardMaterial color = { hovered? 'hotpink': '#2f74c0' } />
-            </mesh>
-)
+        <mesh { ...props } ref = { meshRef } scale = { active? 1.5: 1 }
+            onClick = 
+            {(event) => 
+                setActive(!active)
+            }
+            onPointerOver = 
+            {
+                (event) => setHover(true)
+            }
+            onPointerOut = 
+            {
+                (event) => setHover(false)
+            }>
+
+            <boxGeometry args={ [0.5, 0.5, 0.5] } />
+            <meshStandardMaterial color = { hovered? 'hotpink': '#2f74c0' } />
+
+        </mesh>
+    )
 }
 
-function Bike({ camCtrlRef }: { camCtrlRef: React.RefObject<OrbitControlsImpl | null> })
+function Bike({ camCtrlRef, camRotatingFlag }: 
+    { camCtrlRef: React.RefObject<OrbitControlsImpl | null>, camRotatingFlag: boolean })
 {
     return (
         <SBModel withPivotCtrls = {false} 
         modelPath = {'/models/motorcycles/BMW/S1000 RR/scene.gltf'} 
-        camCtrlRef = {camCtrlRef}/>
+        camCtrlRef = {camCtrlRef}
+        camRotatingFlag = {camRotatingFlag}/>
     )
 }
 
@@ -62,7 +73,9 @@ function FastCameraLogger({ textRef }: { textRef: React.RefObject<HTMLHeadingEle
 export default function Sandbox() {
 
     const cameraTextRef = useRef<HTMLHeadingElement>(null)
-    const controlsRef = useRef<OrbitControlsImpl>(null)
+    const [controlsRef, [rotatingFlag, setRotatingFlag]]
+    : [controlsRef: React.RefObject<OrbitControlsImpl | null>, [rotatingFlag: boolean, setRotatingFlag: Dispatch<SetStateAction<boolean>>]]
+    = [useRef<OrbitControlsImpl>(null), useState<boolean>(false)]
 
     return (
         <>
@@ -94,10 +107,18 @@ export default function Sandbox() {
             <Box position={[1.2, 0, 0]} />
 
             <Suspense fallback={<Loader />}>
-                <Bike camCtrlRef={controlsRef}/>
+                <Bike camCtrlRef={controlsRef} camRotatingFlag={rotatingFlag} />
             </Suspense>
 
-            <OrbitControls ref={controlsRef}/>
+            <OrbitControls ref={controlsRef}
+             onStart= {() =>
+             {
+                setRotatingFlag(true)
+             }}
+             onEnd= {() =>
+             {
+                setRotatingFlag(false)
+             }}/>
 
             <FastCameraLogger textRef={cameraTextRef} />
         </Canvas>
