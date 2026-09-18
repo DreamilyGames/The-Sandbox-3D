@@ -1,4 +1,4 @@
-import React, { useRef, useState, Component, Suspense, type Dispatch, type SetStateAction } from 'react'
+import React, { useRef, useState, Component, Suspense, type Dispatch, type SetStateAction, useEffect } from 'react'
 
 import * as THREE from 'three'
 import { OrbitControls, Html, useProgress, Grid, PivotControls } from '@react-three/drei'
@@ -7,6 +7,7 @@ import { Canvas, useFrame, useThree, useLoader, type ThreeElements, type ThreeEv
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import './index.css'
 import './SBSandbox.css'
+import { useSelectModelStore } from './World/SBWorld'
 import {SBModel} from './Renderer/Model/SBModel'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 
@@ -43,7 +44,7 @@ function Bike({ camCtrlRef, camRotatingFlag }:
     { camCtrlRef: React.RefObject<OrbitControlsImpl | null>, camRotatingFlag: boolean })
 {
     return (
-        <SBModel withPivotCtrls = {false} 
+        <SBModel enablePivotCtrls = {true} 
         modelPath = {'/models/motorcycles/BMW/S1000 RR/scene.gltf'} 
         camCtrlRef = {camCtrlRef}
         camRotatingFlag = {camRotatingFlag}/>
@@ -70,6 +71,8 @@ function FastCameraLogger({ textRef }: { textRef: React.RefObject<HTMLHeadingEle
   return null
 }
 
+
+
 export default function Sandbox() {
 
     const cameraTextRef = useRef<HTMLHeadingElement>(null)
@@ -77,9 +80,24 @@ export default function Sandbox() {
     : [controlsRef: React.RefObject<OrbitControlsImpl | null>, [rotatingFlag: boolean, setRotatingFlag: Dispatch<SetStateAction<boolean>>]]
     = [useRef<OrbitControlsImpl>(null), useState<boolean>(false)]
 
+    //Use this if a subscription to the selected model is needed in the future. 
+    // Currently, it is not used.
+    /*useEffect(() => 
+    {    
+        const unsubscribe = useSelectModelStore.subscribe(
+            (state:any) => state.selectedModel,
+            (newModel:any) => 
+            {
+                
+            }
+        )
+        return () => unsubscribe() // Cleanup subscription on unmount
+    }, [])*/
+
     return (
         <>
         <div className="canvas-container">
+        {/* Canvas component for the 3D world */}
         <Canvas camera = {{ fov: 50, position: [2.14, 1.27, 1.78] }}>
             <ambientLight intensity= { Math.PI / 2 } />
 
@@ -123,9 +141,11 @@ export default function Sandbox() {
             <FastCameraLogger textRef={cameraTextRef} />
         </Canvas>
 
-            <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, color: 'white' }}>
-                <h1 ref={cameraTextRef}></h1>
-            </div>
+        {/* UI components */}
+        <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, color: 'white' }}>
+            <h1 ref={cameraTextRef}></h1>
+        </div>
+
         </div>
         </>            
     )

@@ -6,29 +6,71 @@ import { MeshoptSimplifier } from 'meshoptimizer'
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three'
 import { easing } from 'maath'
-import '../../World/SBWorld'
+import {useSelectModelStore} from '../../World/SBWorld'
 
+/**
+ * Clone a 3D model scene. Optionally includes its geometries and materials
+ * to ensure that the original model remains unaltered if requested.
+ * @param modelScene - The 3D model scene.
+ * @param deepClone - Whether to perform a deep clone of the scene hierarchy (default: true).
+ * @param cloneGeometriesAndMaterials - Whether to clone geometries and materials (default: false).
+ * @returns The cloned 3D model
+ */
+export function CloneModel(modelScene: THREE.Group, 
+    deepClone: boolean = true,
+    cloneGeometriesAndMaterials: boolean = false): THREE.Group
+{
+    // 1. Deep clone the scene hierarchy (clones Object3D nodes)
+    const clonedScene = modelScene.clone(deepClone);
+
+    if(cloneGeometriesAndMaterials)
+    {
+        // 2. Traverse and clone individual geometries/index buffers
+        clonedScene.traverse((child) => 
+        {
+            if ((child as THREE.Mesh).isMesh) 
+            {
+                const mesh = child as THREE.Mesh;
+
+                // Clone the geometry so vertex and index buffers are detached
+                mesh.geometry = mesh.geometry.clone();
+
+                //Independent material instances
+                if (Array.isArray(mesh.material)) 
+                {
+                    mesh.material = mesh.material.map((mat) => mat.clone());
+                } else if (mesh.material) 
+                {
+                    mesh.material = mesh.material.clone();
+                }
+        }
+        });
+    }
+    return clonedScene;
+}
+
+/**
+ * The properties of the SimplifiedModel component.
+ */
 interface SimplifiedModelProps extends React.ComponentPropsWithoutRef<'primitive'> 
 {
-  modelScene: THREE.Group
-  vertRetain: number
+  modelScene: THREE.Group // The 3D model scene to simplify
+  vertRetain: number // The percentage of vertices to retain (between 0 and 1)
 }
 
 /**
  * Simplifies a 3D model by reducing its vertex count and applying flat shading.
  * @param modelScene - The 3D model scene to simplify.
  * @param vertRetain - The percentage of vertices to retain (between 0 and 1). 
- * @returns 
+ * @returns A DOM object ready for rendering in a React Three Fiber scene
  */
 function SimplifiedModel({ modelScene, vertRetain, ...props }: 
     SimplifiedModelProps) 
 {
-  const scene = modelScene.clone();
-
   const lowPolyScene = useMemo(() => 
   {
-    const clonedScene = scene.clone();
-
+    // Deep clone to avoid mutating the original
+    const clonedScene = CloneModel(modelScene, true, true) 
     clonedScene.traverse(async (child) => 
     {
       if ((child as THREE.Mesh).isMesh) 
@@ -95,7 +137,7 @@ function SimplifiedModel({ modelScene, vertRetain, ...props }:
 
     return clonedScene;
   }, 
-  [scene]);
+  [modelScene]);
 
   return <primitive {...props} object={lowPolyScene}  />;
 }
@@ -126,8 +168,16 @@ const InvertedHullMaterial = {
   depthWrite: false,   // Prevents alpha z-buffer clipping artifacts
 };
 
-export function SBModel({withPivotCtrls, modelPath, camCtrlRef, camRotatingFlag}: 
-    { withPivotCtrls: boolean, 
+/**
+ * Constructs a 3D model DOM component from a GLTF file.
+ * @param enablePivotCtrls - Whether to enable pivot controls for the model.
+ * @param modelPath - The path to the GLTF model file.
+ * @param camCtrlRef - A reference to the camera controls for interaction.
+ * @param camRotatingFlag - A flag indicating whether the camera is currently rotating.
+ * @returns A DOM object ready for rendering in a React Three Fiber scene
+ */
+export function SBModel({enablePivotCtrls, modelPath, camCtrlRef, camRotatingFlag}: 
+    { enablePivotCtrls: boolean, 
     modelPath: string, 
     camCtrlRef: React.RefObject<OrbitControlsImpl | null>, 
     camRotatingFlag: boolean })
@@ -135,16 +185,16 @@ export function SBModel({withPivotCtrls, modelPath, camCtrlRef, camRotatingFlag}
     const gltf = useGLTF(modelPath)
     const [isHovered, setHovered] = useState(false)
     const uOutlineAlphaRef = useRef({ value: 0 }); // Initial alpha
+    const selectedModel = useSelectModelStore((state:any) => state.selectedModel);
+    const setSelectedModel = useSelectModelStore((model:any) => model.setSelectedModel);
     
     const outlineMaterial = useMemo(() => 
         new THREE.ShaderMaterial(InvertedHullMaterial), []);
-
-    const gltfScene2 = useMemo(() => 
-        gltf.scene.clone(), [gltf.scene]);
+    const outlineModelScene = useMemo(() => CloneModel(gltf.scene), [gltf.scene]);
 
     useFrame((state, delta) => 
     {
-        const targetAlpha = isHovered ? 1.0 : 0.0; // Scale factor, not pixel width
+        const targetAlpha = (isHovered || selectedModel) ? 1.0 : 0.0;
 
         easing.damp(
         uOutlineAlphaRef.current,
@@ -160,7 +210,7 @@ export function SBModel({withPivotCtrls, modelPath, camCtrlRef, camRotatingFlag}
 
     useEffect(() => 
     {
-        gltfScene2.traverse((child ) =>
+        outlineModelScene.traverse((child ) =>
         {
             const mesh = child as THREE.Mesh;
             if (mesh.isMesh) 
@@ -169,12 +219,12 @@ export function SBModel({withPivotCtrls, modelPath, camCtrlRef, camRotatingFlag}
                 mesh.material = outlineMaterial
             }
         })
-    }, [gltfScene2])
+    }, [outlineModelScene])
 
     return(
         <>
             <PivotControls
-            enabled={withPivotCtrls}
+            enabled={enablePivotCtrls && selectedModel}
             onDragStart={() => 
             {
                 if(camCtrlRef.current)
@@ -206,6 +256,20 @@ export function SBModel({withPivotCtrls, modelPath, camCtrlRef, camRotatingFlag}
                         onClick = {(e: ThreeEvent<MouseEvent>) =>
                         {
                             e.stopPropagation()
+                            // TODO: Add a check for movement to avoid accidental deselection 
+                            // when dragging the camera
+                            //if(e.movementX === 0 && e.movementY === 0) 
+                            {
+                                if(selectedModel)
+                                {
+                                    //Deselect
+                                    setSelectedModel(null)
+                                }
+                                else
+                                {
+                                    setSelectedModel(gltf.scene)
+                                }
+                            }
                             
                         }}
                         visible = {false}
@@ -215,15 +279,9 @@ export function SBModel({withPivotCtrls, modelPath, camCtrlRef, camRotatingFlag}
 
                     {/* The original (complex) model for display */}
                     <group dispose={null} raycast={() => null}>
-                        <primitive object={gltf.scene}
-                        
-                        
-                        visible = {true}
-                        >
-                        </primitive>
 
-                        
-                        <primitive object={gltfScene2}/>
+                        <primitive object={gltf.scene}/>
+                        <primitive object={outlineModelScene}/>
                     </group>
                 </group>
                 
