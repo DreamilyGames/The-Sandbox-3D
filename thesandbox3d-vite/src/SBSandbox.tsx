@@ -1,4 +1,4 @@
-import React, { useRef, useState, Component, Suspense, type Dispatch, type SetStateAction, useEffect } from 'react'
+import React, { useRef, useState, Component, Suspense, type Dispatch, type SetStateAction, useEffect, type MouseEventHandler } from 'react'
 
 import * as THREE from 'three'
 import { OrbitControls, Html, useProgress, Grid, PivotControls } from '@react-three/drei'
@@ -79,6 +79,7 @@ export default function Sandbox() {
     const [controlsRef, [rotatingFlag, setRotatingFlag]]
     : [controlsRef: React.RefObject<OrbitControlsImpl | null>, [rotatingFlag: boolean, setRotatingFlag: Dispatch<SetStateAction<boolean>>]]
     = [useRef<OrbitControlsImpl>(null), useState<boolean>(false)]
+    const selectedModel = useSelectModelStore((state:any) => state.selectedModel)
 
     //Use this if a subscription to the selected model is needed in the future. 
     // Currently, it is not used.
@@ -96,9 +97,21 @@ export default function Sandbox() {
 
     return (
         <>
-        <div className="canvas-container">
+        <div className="canvas-container bg-slate-900/40">
         {/* Canvas component for the 3D world */}
-        <Canvas camera = {{ fov: 50, position: [2.14, 1.27, 1.78] }}>
+        <Canvas camera = {{ fov: 50, position: [2.14, 1.27, 1.78] }}
+            onPointerMissed={(e) => 
+            {
+                if(e.type === 'click')
+                {
+                    if(selectedModel)
+                    {
+                        // Deselect when clicking on the canvas background
+                        useSelectModelStore.setState({ selectedModel: null })
+                    }
+                }
+                
+            }}>
             <ambientLight intensity= { Math.PI / 2 } />
 
             <spotLight position = { [10, 10, 10] } angle = { 0.15} 
@@ -142,11 +155,22 @@ export default function Sandbox() {
         </Canvas>
 
         {/* UI components */}
-        <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, color: 'white' }}>
-            <h1 ref={cameraTextRef}></h1>
-        </div>
+            <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, color: 'white' }}>
+                <h1 ref={cameraTextRef}></h1>
+            </div>
 
-        </div>
+            {/* Property Panel */}  
+            <div className={`absolute inset-y-10 -right-100 w-90 h-9/10 p-4 
+            bg-[var(--color-deep-purple)] backdrop-blur-md opacity-90 border-4 
+            border-[var(--color-light-purple) flex-1 justify-start]
+            border-opacity-100 rounded-xl transition-transform ease-in-out
+            duration-100 ${selectedModel ? ' -translate-x-105' : ' translate-x-0'}`}>
+                <details className="place-self-start select-none text-white">
+                    <summary>Materials</summary>
+                </details>
+            </div>
+
+            </div>
         </>            
     )
 }

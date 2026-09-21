@@ -1,3 +1,4 @@
+@import "tailwindcss";
 /* Reset body & HTML to prevent scrollbars and layout shifts */
 html,
 body,
@@ -16,4 +17,11 @@ body,
   width: 100vw;
   height: 100vh;
   z-index: 0;
+  
+}
+
+@theme
+{
+  --color-deep-purple: oklch(0.2076 0.0464 310.87);
+  --color-light-purple: oklch(0.7341 0.1401 310.87);
 }

@@ -187,6 +187,7 @@ export function SBModel({enablePivotCtrls, modelPath, camCtrlRef, camRotatingFla
     const uOutlineAlphaRef = useRef({ value: 0 }); // Initial alpha
     const selectedModel = useSelectModelStore((state:any) => state.selectedModel);
     const setSelectedModel = useSelectModelStore((model:any) => model.setSelectedModel);
+    const mouseDownPos = useRef<{ x: number; y: number }>({x:-1, y:-1});
     
     const outlineMaterial = useMemo(() => 
         new THREE.ShaderMaterial(InvertedHullMaterial), []);
@@ -253,12 +254,27 @@ export function SBModel({enablePivotCtrls, modelPath, camCtrlRef, camRotatingFla
                         {
                             (e: ThreeEvent<MouseEvent>) => setHovered(false)
                         }
+                        onPointerDown =
+                        {(e: ThreeEvent<PointerEvent>) =>
+                            {
+                                mouseDownPos.current = {x: e.clientX, y: e.clientY}
+                            }
+                        }
                         onClick = {(e: ThreeEvent<MouseEvent>) =>
                         {
                             e.stopPropagation()
-                            // TODO: Add a check for movement to avoid accidental deselection 
-                            // when dragging the camera
-                            //if(e.movementX === 0 && e.movementY === 0) 
+                            // Calculate distance moved between pointer down and click release
+                            const deltaX = e.clientX - mouseDownPos.current.x;
+                            const deltaY = e.clientY - mouseDownPos.current.y;
+                            const distance = Math.hypot(deltaX, deltaY);
+
+                            // 5px threshold: If moved more than 5 pixels, 
+                            // treat as an OrbitControls drag
+                            if (distance > 3) 
+                            {
+                                return; // Ignore false click
+                            }
+                            else
                             {
                                 if(selectedModel)
                                 {
