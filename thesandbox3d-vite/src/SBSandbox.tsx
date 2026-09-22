@@ -134,8 +134,8 @@ export default function Sandbox() {
                 infiniteGrid                  // Extends grid endlessly
             />
 
-            <Box position={[-1.2, 0, 0]} />
-            <Box position={[1.2, 0, 0]} />
+            {/*<Box position={[-1.2, 0, 0]} />
+            <Box position={[1.2, 0, 0]} />*/}
 
             <Suspense fallback={<Loader />}>
                 <Bike camCtrlRef={controlsRef} camRotatingFlag={rotatingFlag} />
@@ -154,10 +154,11 @@ export default function Sandbox() {
             <FastCameraLogger textRef={cameraTextRef} />
         </Canvas>
 
-        {/* UI components */}
+        {/* UI components 
             <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, color: 'white' }}>
                 <h1 ref={cameraTextRef}></h1>
             </div>
+        */}
 
             {/* Property Panel */}  
             <div className={`absolute inset-y-10 -right-100 w-90 h-9/10 p-4 
