@@ -6,7 +6,7 @@ import { Canvas, useFrame, type ThreeElements, type ThreeEvent
 import './index.css'
 import './SBSandbox.css'
 import { useSelectModelStore } from './World/SBWorld'
-import {SBModel} from './Renderer/Model/SBModel'
+import {SBModel} from './Actor/Model/SBModel'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import {v4 as uuidv4} from 'uuid';
 import { SBSceneGraphNode } from './UI/SBSceneGraphNode'
