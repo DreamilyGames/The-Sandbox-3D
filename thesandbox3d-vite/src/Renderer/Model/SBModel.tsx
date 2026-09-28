@@ -13,6 +13,9 @@ import {v4 as uuidv4} from 'uuid';
  * @param camRotatingFlag - A flag indicating whether the camera is currently rotating.
  * @returns A DOM object ready for rendering in a React Three Fiber scene
  */
+
+let globalCounter = 0
+
 export function SBModel({enablePivotCtrls, modelPath, camCtrlRef, camRotatingFlag}: 
     { enablePivotCtrls: boolean, 
     modelPath: string, 
@@ -22,9 +25,9 @@ export function SBModel({enablePivotCtrls, modelPath, camCtrlRef, camRotatingFla
     const gltf = useGLTF(modelPath)
 
     const meshesInGLTF = useRef<{ref: THREE.Mesh, key: string}[]>([]);
-    useMemo(()=>
+    
+    if(meshesInGLTF.current.length <= 0)
     {
-        let i = 0
         gltf.scene.updateMatrixWorld(true)
         gltf.scene.traverse((child)=>
         {
@@ -32,10 +35,9 @@ export function SBModel({enablePivotCtrls, modelPath, camCtrlRef, camRotatingFla
             if (mesh.isMesh) 
             {
                 meshesInGLTF.current.push({ref: mesh, key: uuidv4()})
-                ++i
             }
         })
-    }, [gltf.scene])
+    }
 
     return(
         <>

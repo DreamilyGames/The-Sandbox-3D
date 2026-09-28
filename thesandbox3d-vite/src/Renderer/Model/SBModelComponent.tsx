@@ -27,7 +27,7 @@ export function CloneMesh(mesh: THREE.Mesh,
         // Traverse and clone individual geometries/index buffers
         // Clone the geometry so vertex and index buffers are detached
         clonedMesh.geometry = mesh.geometry.clone()
-        clonedMesh.matrixWorld = mesh.matrixWorld
+        clonedMesh.matrixWorld = mesh.matrixWorld.clone()
 
         //Independent material instances
         if (Array.isArray(mesh.material)) 
@@ -185,7 +185,7 @@ export function SBModelComponent({enablePivotCtrls, mesh, camCtrlRef, camRotatin
     
     const outlineMaterial = useMemo(() => 
         InvertedHullMaterial.clone(), [InvertedHullMaterial]);
-    const outlineMesh = useMemo(() => CloneMesh(mesh), [mesh]);
+    const outlineMesh = useMemo(() => CloneMesh(mesh, false), [mesh]);
     
     useEffect(() => 
         {
@@ -218,6 +218,8 @@ export function SBModelComponent({enablePivotCtrls, mesh, camCtrlRef, camRotatin
         outlineMaterial
         .uniforms.uOutlineAlpha.value = uOutlineAlphaRef.current.value;
     });
+
+    
 
     return(
         <>
