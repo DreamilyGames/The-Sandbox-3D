@@ -10,7 +10,7 @@ import {SBModel} from './Actor/Model/SBModel'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import {v4 as uuidv4} from 'uuid';
 import { SBSceneGraphNode } from './UI/SBSceneGraphNode'
-import { SBThreeJSTexturePreview } from './Renderer/SBThreeJSTexturePreview'
+import { SBThreeJSTexturePreview } from './UI/SBThreeJSTexturePreview'
 import { SBColorPicker } from './UI/SBColorPicker'
 
 function Box(props: ThreeElements['mesh']) 
