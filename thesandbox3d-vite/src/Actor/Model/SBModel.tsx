@@ -13,9 +13,6 @@ import {v4 as uuidv4} from 'uuid';
  * @param camRotatingFlag - A flag indicating whether the camera is currently rotating.
  * @returns A DOM object ready for rendering in a React Three Fiber scene
  */
-
-let globalCounter = 0
-
 export function SBModel({enablePivotCtrls, modelPath, camCtrlRef, camRotatingFlag}: 
     { enablePivotCtrls: boolean, 
     modelPath: string, 

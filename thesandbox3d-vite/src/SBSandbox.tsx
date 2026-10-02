@@ -1,6 +1,6 @@
 import React, { useRef, useState, Component, Suspense, type Dispatch, type SetStateAction, useEffect, type MouseEventHandler, useMemo } from 'react'
 import * as THREE from 'three'
-import { OrbitControls, Html, useProgress, Grid, useGLTF } from '@react-three/drei'
+import { OrbitControls, Html, useProgress, Grid, useGLTF, Environment } from '@react-three/drei'
 import { Canvas, useFrame, type ThreeElements, type ThreeEvent
  } from '@react-three/fiber'
 import './index.css'
@@ -12,6 +12,7 @@ import {v4 as uuidv4} from 'uuid';
 import { SBSceneGraphNode } from './UI/SBSceneGraphNode'
 import { SBThreeJSTexturePreview } from './UI/SBThreeJSTexturePreview'
 import { SBColorPicker } from './UI/SBColorPicker'
+import { suspend } from 'suspend-react'
 
 function Box(props: ThreeElements['mesh']) 
 {
@@ -97,7 +98,7 @@ export default function Sandbox()
         )
         return () => unsubscribe() // Cleanup subscription on unmount
     }, [])*/
-
+    
     const gltf = useGLTF("/models/motorcycles/BMW/S1000 RR/scene.gltf")
     return (
         <div className='flex h-screen w-screen overflow-hidden'>
@@ -117,7 +118,7 @@ export default function Sandbox()
                     }} />
                 ))}
             </aside>
-
+            
 
             <main className="w-3/4 canvas-container relative bg-slate-900/40 flex-1">
                 {/* Canvas component for the 3D world */}
@@ -134,13 +135,13 @@ export default function Sandbox()
                         }
                         
                     }}>
+
+                        {/* 
+                            Preset options: 'city', 'night', 'park', 'studio', 'sunset', 'dawn', 'forest', 'apartment', 'warehouse'
+                            - background: Renders the skybox in the 3D background
+                        */}
+                    <Environment preset="apartment" background/>
                     <ambientLight intensity= { Math.PI / 2 } />
-
-                    <spotLight position = { [10, 10, 10] } angle = { 0.15} 
-                    penumbra = { 1} decay = { 0} intensity = { Math.PI } />
-
-                    <pointLight position={ [-10, -10, -10] } decay = { 0} 
-                    intensity = { Math.PI } />
 
                     <Grid
                         position={[0, -0.01, 0]}      // Slightly below origin to prevent z-fighting

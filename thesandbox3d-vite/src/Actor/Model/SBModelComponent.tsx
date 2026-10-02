@@ -282,7 +282,7 @@ export function SBModelComponent({enablePivotCtrls, mesh, camCtrlRef, camRotatin
                             }
                             else
                             {
-                                if(selectedModel)
+                                if(selectedModel == mesh)
                                 {
                                     //Deselect
                                     setSelectedModel(null)

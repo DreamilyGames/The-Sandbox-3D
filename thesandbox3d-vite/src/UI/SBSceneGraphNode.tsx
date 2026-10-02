@@ -19,11 +19,12 @@ export function SBSceneGraphNode({ node, selectedID, onSelect }: TreeNodeProps)
       {/* Node Row */}
       <div
         onClick={() => onSelect(node)}
-        className={`flex items-center justify-between px-2 py-1 rounded text-xs cursor-pointer ${
+        className={`flex items-center justify-between px-2 py-1 rounded text-xs cursor-pointer
+          w-fit ${
           isSelected ? 'bg-sky-600 text-white' : 'hover:bg-slate-800 text-slate-300'
         }`}
       >
-        <div className="flex items-center space-x-1.5 truncate">
+        <div className="flex items-center space-x-1.5">
           {hasChildren && (
             <button
               onClick={(e) => {
@@ -37,7 +38,7 @@ export function SBSceneGraphNode({ node, selectedID, onSelect }: TreeNodeProps)
           )}
           <span className="truncate">{node.name}</span>
         </div>
-        <span className="text-[10px] opacity-50 uppercase">{node.type}</span>
+        <span className="pl-3 text-[10px] opacity-50 uppercase">{node.type}</span>
       </div>
 
       {/* Recursive Render of Nested Children */}
