@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import * as THREE from 'three';
 
 interface MaterialColorPickerProps {
+  children: React.ReactNode;
+  propName: string;
   mesh: THREE.Mesh | null;
 }
 
-export function SBColorPicker({ mesh }: MaterialColorPickerProps) 
+export function SBColorPicker({ children, propName, mesh }: MaterialColorPickerProps) 
 {
   const [currentColor, setCurrentColor] = useState<string>('#ffffff');
   const [supportedMaterial, setSupportedMaterial] = useState<THREE.Material | null>(null);
@@ -26,10 +28,10 @@ export function SBColorPicker({ mesh }: MaterialColorPickerProps)
       return;
     }
 
-    // Check if the material supports color (Standard, Basic, Physical, Phong, Lambert)
-    if ('color' in mat && (mat as any).color instanceof THREE.Color) 
+    // Check if the material supports the specified property (Standard, Basic, Physical, Phong, Lambert)
+    if (propName in mat && (mat as any)[propName] instanceof THREE.Color) 
     {
-      const hexColor = `#${(mat as any).color.getHexString()}`;
+      const hexColor = `#${(mat as any)[propName].getHexString()}`;
       setCurrentColor(hexColor);
       setSupportedMaterial(mat);
     } else 
@@ -43,10 +45,10 @@ export function SBColorPicker({ mesh }: MaterialColorPickerProps)
     const newHex = e.target.value;
     setCurrentColor(newHex);
 
-    if (supportedMaterial && 'color' in supportedMaterial) 
+    if (supportedMaterial && propName in supportedMaterial) 
     {
       // 1. Update the THREE.Color object
-      (supportedMaterial as any).color.set(newHex);
+      (supportedMaterial as any)[propName].set(newHex);
 
       // 2. Mark material as needing a GPU update
       supportedMaterial.needsUpdate = true;
@@ -62,7 +64,7 @@ export function SBColorPicker({ mesh }: MaterialColorPickerProps)
   {
     return (
       <div className="text-xs text-slate-500 italic p-2 bg-slate-900 rounded border border-slate-800">
-        Selected material (${mesh.material ? (mesh.material as THREE.Material).type : `null`}) does not support direct color modifications.
+        Selected material (${mesh.material ? (mesh.material as THREE.Material).type : `null`}) does not support {children} color modifications.
       </div>
     );
   }
@@ -70,7 +72,7 @@ export function SBColorPicker({ mesh }: MaterialColorPickerProps)
   return (
     <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-2">
       <div className="flex items-center justify-between">
-        <label className="text-xs font-medium text-slate-300">Material Color</label>
+        <label className="text-xs font-medium text-slate-300">{children} Color</label>
         <span className="text-xs font-mono text-slate-400 uppercase">{currentColor}</span>
       </div>
 
@@ -80,7 +82,9 @@ export function SBColorPicker({ mesh }: MaterialColorPickerProps)
           type="color"
           value={currentColor}
           onChange={handleColorChange}
-          className="w-10 h-10 rounded border border-slate-700 bg-transparent cursor-pointer p-0.5 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-0 [&::-webkit-color-swatch]:rounded"
+          className="w-10 h-10 rounded border border-slate-700 bg-transparent 
+          cursor-pointer p-0.5 [&::-webkit-color-swatch-wrapper]:p-0 
+          [&::-webkit-color-swatch]:border-0 [&::-webkit-color-swatch]:rounded"
         />
 
         {/* Quick Swatches (Optional Preset Buttons) */}
@@ -92,7 +96,8 @@ export function SBColorPicker({ mesh }: MaterialColorPickerProps)
                 handleColorChange({ target: { value: preset } } as any);
               }}
               style={{ backgroundColor: preset }}
-              className="w-5 h-5 rounded-full border border-slate-700 hover:scale-110 transition-transform"
+              className="w-5 h-5 rounded-full border border-slate-700 hover:scale-110 
+              transition-transform"
               title={preset}
             />
           ))}

@@ -13,6 +13,10 @@ import { SBSceneGraphNode } from './UI/SBSceneGraphNode'
 import { SBThreeJSTexturePreview } from './UI/SBThreeJSTexturePreview'
 import { SBColorPicker } from './UI/SBColorPicker'
 import { suspend } from 'suspend-react'
+import { SBDraggableOutliner } from './UI/SBDraggableContainer'
+import { GetTailwindColor } from './UI/SBTailwindCSSReader'
+import { SBSlider } from './UI/SBSlider'
+import { inspectMaterialSchema } from './Renderer/Material/SBMaterialProperties'
 
 function Box(props: ThreeElements['mesh']) 
 {
@@ -85,6 +89,11 @@ export default function Sandbox()
     const selectModel = useSelectModelStore((state:any) => state.setSelectedModel)
     const [isOpen, setIsOpen] = useState(false)
 
+    const schema = useMemo(() => {
+    if (!selectedModel) return [];
+    return inspectMaterialSchema(selectedModel.material);
+  }, [selectedModel])
+
     //Use this if a subscription to the selected model is needed in the future. 
     // Currently, it is not used.
     /*useEffect(() => 
@@ -102,11 +111,13 @@ export default function Sandbox()
     const gltf = useGLTF("/models/motorcycles/BMW/S1000 RR/scene.gltf")
     return (
         <div className='flex h-screen w-screen overflow-hidden'>
-            {/* Scene Graph */}
-            <aside className="w-1/4 flex-shrink-0
-            bg-slate-900/90 z-10 flex flex-col p-4 select-none text-left scroll-smooth
-            overflow-y-auto min-h-0">
-                <h1 className={`justify-start text-base`}>Scene</h1>
+
+            <SBDraggableOutliner initialWidth={320} minWidth={240} maxWidth={520}>
+                {/* Scene Graph */}
+                <h1 className={`justify-start pl-3 
+                    text-base border-b border-[var(--color-default-grey)]`}>
+                    Scene
+                </h1>
 
                 {gltf.scene.children.map((child)=>
                 (
@@ -117,10 +128,10 @@ export default function Sandbox()
                         selectModel(obj)
                     }} />
                 ))}
-            </aside>
+            </SBDraggableOutliner>
             
 
-            <main className="w-3/4 canvas-container relative bg-slate-900/40 flex-1">
+            <main className="canvas-container relative bg-slate-900/40 flex-1">
                 {/* Canvas component for the 3D world */}
                 <Canvas camera = {{ fov: 50, position: [2.14, 1.27, 1.78] }}
                     onPointerMissed={(e) => 
@@ -151,7 +162,7 @@ export default function Sandbox()
                         cellColor="#64748b"           // Color of main grid lines
                         sectionSize={4.0}             // Major section line spacing
                         sectionThickness={1.2}        // Major section line thickness
-                        sectionColor="#38bdf8"         // Color of major section lines
+                        sectionColor={GetTailwindColor(`--color-default-white`)} // Color of major section lines
                         fadeDistance={50}             // How far the grid extends before fading out
                         fadeStrength={1}              // Fadeout dropoff strength
                         infiniteGrid                  // Extends grid endlessly
@@ -184,9 +195,9 @@ export default function Sandbox()
                 */}
 
                 {/* Property Panel */}  
-                <div className={`absolute inset-y-10 -right-100 w-90 h-9/10 p-4 
-                bg-[var(--color-deep-purple)] backdrop-blur-md opacity-90 border-4 
-                border-[var(--color-light-purple) flex-1 justify-start]
+                <div className={`absolute inset-y-10 -right-100 w-90 h-9/10 p-4 overflow-y-auto
+                bg-[var(--color-default-black)] backdrop-blur-md opacity-90 border-4 
+                border-[var(--color-default-grey)] flex-1 justify-start
                 border-opacity-100 rounded-xl transition-transform ease-in-out
                 duration-100 ${selectedModel ? ' -translate-x-105' : ' translate-x-0'}`}>
                     <div className="pl-0">
@@ -214,16 +225,73 @@ export default function Sandbox()
                 
                     {/* Node Content */}
                     {(isOpen && selectedModel) && (
-                        <div className="border-l border-slate-800 ml-2 space-y-0.5">
-                            <SBThreeJSTexturePreview 
-                            texture={selectedModel ? 
-                                ((selectedModel as THREE.Mesh).material as THREE.MeshPhysicalMaterial).map :
-                                null
-                            }>
-                            </SBThreeJSTexturePreview>
-                            <SBColorPicker mesh={selectedModel}>
-                                
-                            </SBColorPicker>
+
+                        <div className="">
+                        {schema.map((field) => {
+                            if (field.type === 'color') {
+                            return <SBColorPicker propName={field.key} mesh={selectedModel}>
+                                        {field.label}
+                                    </SBColorPicker>;
+                            }
+
+                            if (field.type === 'number') {
+                            return (
+                                <SBSlider
+                                propName={field.key}
+                                mesh={selectedModel}
+                                >
+                                    {field.label}
+                                </SBSlider>
+                            );
+                            }
+
+                            if (field.type === 'boolean') {
+                            return (
+                                <div key={field.key} className="flex justify-between items-center p-2 bg-slate-900 rounded border border-slate-800">
+                                {/*<span className="text-xs text-slate-300">{field.label}</span>
+                                <input
+                                    type="checkbox"
+                                    defaultChecked={Boolean(field.value)}
+                                    onChange={(e) => {
+                                    updateMaterialProperty(mat, field, e.target.checked);
+                                    forceRender({});
+                                    }}
+                                    className="w-4 h-4 accent-sky-500 cursor-pointer"
+                                />*/}
+                                </div>
+                            );
+                            }
+
+                            return null;
+                        })}
+
+                        {/*<div className="">
+                            <div className="border-l border-slate-800 ml-2 space-y-0.5">
+                                <SBThreeJSTexturePreview 
+                                texture={
+                                    ((selectedModel as THREE.Mesh).material as THREE.MeshPhysicalMaterial).map
+                                }>
+                                    Diffuse
+                                </SBThreeJSTexturePreview>
+
+                                <SBColorPicker propName={"color"} mesh={selectedModel}>
+                                    Diffuse     
+                                </SBColorPicker>
+                            </div>
+
+                            <div className="border-l border-slate-800 ml-2 space-y-0.5">
+                                <SBThreeJSTexturePreview 
+                                texture={
+                                    ((selectedModel as THREE.Mesh).material as THREE.MeshPhysicalMaterial).metalnessMap
+                                }>
+                                    Metalness
+                                </SBThreeJSTexturePreview>
+
+                                <SBSlider propName={"metalness"} mesh={selectedModel}>
+                                    Metalness     
+                                </SBSlider>
+                            </div>
+                        </div>*/}
                         </div>
                     )}
                     

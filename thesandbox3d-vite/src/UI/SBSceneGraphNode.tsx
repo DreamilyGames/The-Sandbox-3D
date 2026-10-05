@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import * as THREE from 'three'
 
-interface TreeNodeProps 
+interface SBSceneGraphNodeProps
 {
   node: THREE.Object3D;
   selectedID: string | null;
   onSelect: (object: THREE.Object3D) => void;
 }
 
-export function SBSceneGraphNode({ node, selectedID, onSelect }: TreeNodeProps) 
+export function SBSceneGraphNode({ node, selectedID, onSelect }: SBSceneGraphNodeProps) 
 {
   const [isOpen, setIsOpen] = useState(true);
   const isSelected = selectedID ? selectedID === node.uuid : false;

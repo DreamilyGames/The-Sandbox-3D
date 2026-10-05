@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import * as THREE from 'three';
 
 interface SBThreeJSTexturePreviewProps {
+  children: React.ReactNode;
   texture: THREE.Texture | null;
 }
 
-export function SBThreeJSTexturePreview({ texture }: SBThreeJSTexturePreviewProps) 
+export function SBThreeJSTexturePreview({ children, texture }: SBThreeJSTexturePreviewProps) 
 {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
 
@@ -41,15 +42,25 @@ export function SBThreeJSTexturePreview({ texture }: SBThreeJSTexturePreviewProp
     }
   }, [texture]);
 
-  if (!imageSrc) return <div className="text-xs text-slate-500">No texture preview</div>;
+  if (!imageSrc || !texture
+    || !texture.image
+  ) return <div className="text-xs text-slate-500">No {children} Texture</div>;
 
   return (
-    <div className="p-2 bg-slate-900 rounded border border-slate-800">
-      <img
-        src={imageSrc}
-        alt="Material Texture Preview"
-        className="w-32 h-32 object-cover rounded border border-slate-700"
-      />
+    <div className="flex-1 p-2 bg-slate-900 rounded border border-slate-800">
+      <div className="text-left items-start">
+        <label className="text-left py-3 text-xs font-medium text-slate-300
+        ">{children} Texture</label>
+      </div>
+      
+      <div className="flex-1 py-3 items-center justify-between">
+        <img
+          src={imageSrc}
+          alt={`${children} Texture Preview`}
+          className="w-32 h-32 object-cover rounded border border-slate-700"
+        />
+      </div>
+      
     </div>
   );
 }

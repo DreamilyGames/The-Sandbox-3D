@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+@theme
+{
+  --color-deep-purple: #1e1127;
+  --color-light-purple: #c58eea;
+
+  --color-default-white: #defff2;
+  --color-default-darker-white: #bdcec7;
+  --color-default-grey: #585858;
+  --color-default-black: #232323;
+}
+
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -68,11 +79,15 @@ body {
   margin: 0;
 }
 
+aside {
+  background-color: var(--color-default-black);
+}
+
 h1,
 h2 {
   font-family: var(--heading);
   font-weight: 500;
-  color: var(--text-h);
+  color: var(--color-default-darker-white);
 }
 
 h1 {
