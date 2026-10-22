@@ -1,78 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
 
-interface MaterialColorPickerProps {
+
+
+interface SBColorPickerProps {
   children: React.ReactNode;
-  propName: string;
-  mesh: THREE.Mesh | null;
+  defaultColor?: string; // Optional default color in hex format (e.g., '#ff0000')
+  onChange?: (newColor: string) => void; // Optional callback for color changes
 }
 
-export function SBColorPicker({ children, propName, mesh }: MaterialColorPickerProps) 
+export function SBColorPicker({ children, defaultColor, onChange }: SBColorPickerProps) 
 {
-  const [currentColor, setCurrentColor] = useState<string>('#ffffff');
-  const [supportedMaterial, setSupportedMaterial] = useState<THREE.Material | null>(null);
+  const [currentColor, setCurrentColor] = useState<string>(
+    defaultColor ? defaultColor : '#ffffff');
 
-  useEffect(() => 
-  {
-    if (!mesh) 
-    {
-      setSupportedMaterial(null);
-      return;
-    }
-
-    // Handle single material or pick the first from a multi-material array
-    const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-    if (!mat) 
-    {
-      setSupportedMaterial(null);
-      return;
-    }
-
-    // Check if the material supports the specified property (Standard, Basic, Physical, Phong, Lambert)
-    if (propName in mat && (mat as any)[propName] instanceof THREE.Color) 
-    {
-      const hexColor = `#${(mat as any)[propName].getHexString()}`;
-      setCurrentColor(hexColor);
-      setSupportedMaterial(mat);
-    } else 
-    {
-      setSupportedMaterial(null);
-    }
-  }, [mesh]);
-
-  const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => 
+  const handleColorChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => 
   {
     const newHex = e.target.value;
     setCurrentColor(newHex);
-
-    if (supportedMaterial && propName in supportedMaterial) 
+    if(onChange)
     {
-      // 1. Update the THREE.Color object
-      (supportedMaterial as any)[propName].set(newHex);
-
-      // 2. Mark material as needing a GPU update
-      supportedMaterial.needsUpdate = true;
+      onChange(newHex);
     }
-  };
-
-  if (!mesh) 
-  {
-    return <div className="text-xs text-slate-500 italic">No mesh selected</div>;
-  }
-
-  if (!supportedMaterial) 
-  {
-    return (
-      <div className="text-xs text-slate-500 italic p-2 bg-slate-900 rounded border border-slate-800">
-        Selected material (${mesh.material ? (mesh.material as THREE.Material).type : `null`}) does not support {children} color modifications.
-      </div>
-    );
-  }
+  },[]);
 
   return (
     <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-2">
       <div className="flex items-center justify-between">
-        <label className="text-xs font-medium text-slate-300">{children} Color</label>
+        <label className="text-xs font-medium text-slate-300">{children}</label>
         <span className="text-xs font-mono text-slate-400 uppercase">{currentColor}</span>
       </div>
 

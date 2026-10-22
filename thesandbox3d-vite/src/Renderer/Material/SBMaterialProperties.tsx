@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GetHexColorFromThreeColor } from '../../Maths/SBColor';
 
 /** Supported field control types for the UI renderer */
 export type MaterialControlGroup =
@@ -8,7 +9,8 @@ export type MaterialControlGroup =
   | 'texture'
   | 'vector2'
   | 'vector3'
-  | 'select';
+  | 'select'
+  | 'undefined';
 
 /** Normalized schema item consumed by dynamic UI components */
 export interface MaterialFieldSchema {
@@ -46,12 +48,25 @@ const EXCLUDED_KEYS = new Set([
   'stencilFail',
   'stencilZFail',
   'stencilZPass',
+  'blending',
+  'blendSrc',
+  'blendDst',
+  'blendEquation',
+  'depthFunc',
+  'stencilWriteMask',
+  'stencilFuncMask',
+  'transparent', //users dont need to see this, it is derived from opacity
+  'alphaHash',
 ]);
 
 /** Standard PBR property range hints */
-function getRangeHints(key: string): { min: number; max: number; step: number } {
+function getRangeHints(key: string): { min: number; max: number; step: number } 
+{
   const k = key.toLowerCase();
-  if (k.includes('roughness') || k.includes('metalness') || k.includes('opacity') || k.includes('transmission') || k.includes('clearcoat') || k.includes('ior') === false && k.includes('alpha')) {
+  if (k.includes('roughness') || k.includes('metalness') 
+    || k.includes('opacity') || k.includes('transmission') 
+  || k.includes('clearcoat') || k.includes('ior') === false 
+  && k.includes('alpha')) {
     return { min: 0, max: 1, step: 0.01 };
   }
   if (k.includes('ior')) {
@@ -89,7 +104,10 @@ export function inspectMaterialSchema(
 
     Object.keys(uniforms).forEach((key) => {
       // Ignore system uniforms used by render loops
-      if (['uTime', 'time', 'resolution', 'cameraPosition', 'viewMatrix'].includes(key)) return;
+      if (['uTime', 'time', 'resolution', 'cameraPosition', 'viewMatrix'
+      ].includes(key)) return;
+
+      
 
       const u = uniforms[key];
       if (!u || u.value === undefined || u.value === null) return;
@@ -134,11 +152,14 @@ export function inspectMaterialSchema(
     const val = (mat as any)[key];
     if (val === undefined || val === null || typeof val === 'function') continue;
 
+    //Ignore '_' prefixed properties (internal use only)
+    if (key.startsWith('_')) continue;
+
     const label = formatLabel(key);
 
     // 1. Color Property
     if (val instanceof THREE.Color) {
-      schema.push({ key, label, type: 'color', value: val });
+      schema.push({ key, label, type: 'color', value: GetHexColorFromThreeColor(val) });
     }
     // 2. Scalar Number Property
     else if (typeof val === 'number') {

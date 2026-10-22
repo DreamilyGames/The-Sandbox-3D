@@ -4,9 +4,9 @@ import { Clamp } from '../Maths/SBBasicMaths';
 
 interface SBSliderProps {
   children: React.ReactNode;
-  mesh: THREE.Mesh | null;
-  /** propName key on the material (e.g., 'roughness', 'metalness', 'opacity', 'transmission') */
-  propName: string;
+  defaultValue?: number;
+  onChange?: (newValue: number) => void;
+
   numBoxEditable?: boolean;
   min?: number;
   max?: number;
@@ -15,68 +15,50 @@ interface SBSliderProps {
 
 export function SBSlider({
   children,
-  mesh,
-  propName,
+  defaultValue,
+  onChange,
   numBoxEditable = true,
   min = 0,
   max = 1,
-  step = 0.01,
-}: SBSliderProps) {
-  const [value, setValue] = useState<number>(0);
-  const [inputValue, setInputValue] = useState<string>('0.00');
-  const [activeMaterial, setActiveMaterial] = useState<THREE.Material | null>(null);
+  step = 0.01
+}: SBSliderProps) 
+{
+  // TODO: If the defaultValue is infinite, 
+  // we will add a checkbox to allow for infinite values. 
+  // This is useful for properties like "Attenuation Distance" 
+  // where a value of Infinity means "no attenuation".
+  if(!Number.isFinite(defaultValue))
+  {
 
-  // Sync component state when the selected mesh or propName changes
-  useEffect(() => {
-    if (!mesh) {
-      setActiveMaterial(null);
-      return;
-    }
+  }
 
-    // Handle single material or first material in a multi-material array
-    const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+  const [value, setValue] = useState<number>(defaultValue ? defaultValue : 0);
+  const [inputValue, setInputValue] = useState<string>(
+    defaultValue ? 
+    defaultValue.toFixed(2) : '0.00');
 
-    if (mat && propName in mat && typeof (mat as any)[propName] === 'number') {
-      setActiveMaterial(mat);
-      setValue((mat as any)[propName]);
-      setInputValue(((mat as any)[propName] as number).toFixed(2));
-    } else {
-      setActiveMaterial(null);
-    }
-  }, [mesh, propName]);
-
-  const updateMaterialProperty = useCallback(
+  const onChange_Internal = 
     (newValue: number) => {
       setValue(newValue);
       setInputValue(newValue.toFixed(2));
-
-      if (activeMaterial && propName in activeMaterial) {
-        // 1. Update the propName on the Three.js material
-        (activeMaterial as any)[propName] = newValue;
-
-        // 2. Special flags for specific properties
-        if (propName === 'opacity') {
-          activeMaterial.transparent = newValue < 1;
-        }
-
-        // 3. Mark material as needing GPU update
-        activeMaterial.needsUpdate = true;
+      if(onChange)
+      {
+        onChange(newValue);
       }
-    },
-    [activeMaterial, propName]
-  );
+    }
+  ;
 
   // Handle range slider drag
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
-    updateMaterialProperty(val);
+    onChange_Internal(val);
   };
 
   const handleNumInputChange = (newValue: string) => {
     const parsed = parseFloat(newValue);
     if (!isNaN(parsed)) 
     {
-      updateMaterialProperty(Clamp(parsed, min, max));
+      onChange_Internal(Clamp(parsed, min, max));
     } 
     else 
     {
@@ -97,22 +79,14 @@ export function SBSlider({
     handleNumInputChange(inputValue)
   };
 
-  const displayLabel = children || propName.charAt(0).toUpperCase() + propName.slice(1);
-
-  if (!mesh) {
-    return <div className="text-xs text-slate-500 italic">No mesh selected</div>;
-  }
-
-  if (!activeMaterial) {
-    return null; // propName not supported by this material type (e.g., metalness on MeshBasicMaterial)
-  }
+  const displayLabel = children;
 
   return (
     <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-2">
       {/* Header: propName Label and Live Readout */}
       <div className="flex items-center justify-between">
         <label className="text-xs font-medium text-slate-300">{displayLabel}</label>
-
+        
         {/* Editable Number Input */}
         <div className="flex items-center space-x-1">
           <input

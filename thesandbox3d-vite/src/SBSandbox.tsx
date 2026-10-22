@@ -16,7 +16,7 @@ import { suspend } from 'suspend-react'
 import { SBDraggableOutliner } from './UI/SBDraggableContainer'
 import { GetTailwindColor } from './UI/SBTailwindCSSReader'
 import { SBSlider } from './UI/SBSlider'
-import { inspectMaterialSchema } from './Renderer/Material/SBMaterialProperties'
+import { inspectMaterialSchema, updateMaterialProperty } from './Renderer/Material/SBMaterialProperties'
 
 function Box(props: ThreeElements['mesh']) 
 {
@@ -229,16 +229,27 @@ export default function Sandbox()
                         <div className="">
                         {schema.map((field) => {
                             if (field.type === 'color') {
-                            return <SBColorPicker propName={field.key} mesh={selectedModel}>
+                            return <SBColorPicker
+                            defaultColor={field.value}
+                            onChange={(newColor: string)=>
+                            {
+                                updateMaterialProperty(selectedModel.material, field, newColor);
+                            }}>
                                         {field.label}
-                                    </SBColorPicker>;
+                                   </SBColorPicker>;
                             }
 
                             if (field.type === 'number') {
                             return (
                                 <SBSlider
-                                propName={field.key}
-                                mesh={selectedModel}
+                                defaultValue={field.value}
+                                onChange={(newValue: number) => 
+                                {
+                                    updateMaterialProperty(selectedModel.material, field, newValue);
+                                }}
+                                min={field.min}
+                                max={field.max}
+                                step={field.step}
                                 >
                                     {field.label}
                                 </SBSlider>
@@ -248,16 +259,15 @@ export default function Sandbox()
                             if (field.type === 'boolean') {
                             return (
                                 <div key={field.key} className="flex justify-between items-center p-2 bg-slate-900 rounded border border-slate-800">
-                                {/*<span className="text-xs text-slate-300">{field.label}</span>
+                                <span className="text-xs text-slate-300">{field.label}</span>
                                 <input
                                     type="checkbox"
                                     defaultChecked={Boolean(field.value)}
                                     onChange={(e) => {
-                                    updateMaterialProperty(mat, field, e.target.checked);
-                                    forceRender({});
+                                    updateMaterialProperty(selectedModel.material, field, e.target.checked);
                                     }}
                                     className="w-4 h-4 accent-sky-500 cursor-pointer"
-                                />*/}
+                                />
                                 </div>
                             );
                             }
