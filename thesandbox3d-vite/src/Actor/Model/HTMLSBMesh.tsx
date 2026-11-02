@@ -1,3 +1,4 @@
+
 import { PivotControls } from '@react-three/drei'
 import  { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { type OrbitControls as OrbitControlsImpl } from 'three-stdlib'
@@ -7,6 +8,9 @@ import * as THREE from 'three'
 import { easing } from 'maath'
 import {useSelectModelStore} from '../../World/SBWorld'
 import {v4 as uuidv4} from 'uuid';
+import { SBActor } from '../SBActor';
+import { useCameraCtrlStore } from '../../World/SBCamera';
+import { SBMesh } from './SBMesh';
 
 /**
  * Clone a THREE.Mesh. Optionally includes its geometries and materials
@@ -126,7 +130,14 @@ function SimplifiedMesh({ mesh, vertRetain, ...props }:
         }**/
     }
 
-    asyncFunc()
+    try
+    {
+        asyncFunc()
+    }
+    catch(e)
+    {
+
+    }
 
     return clonedMesh;
 
@@ -134,7 +145,7 @@ function SimplifiedMesh({ mesh, vertRetain, ...props }:
   [mesh]);
 
   return <mesh uuid={lowPolyMesh.uuid} geometry={lowPolyMesh.geometry}
-  material={lowPolyMesh.material} matrix={lowPolyMesh.matrixWorld} matrixAutoUpdate={false}
+  material={lowPolyMesh.material}
   {...props}/>;
 }
 
@@ -171,36 +182,52 @@ const InvertedHullMaterial = new THREE.ShaderMaterial({
  * @param camCtrlRef - A reference to the camera controls for interaction.
  * @param camRotatingFlag - A flag indicating whether the camera is currently rotating.
  */
-export function SBModelComponent({enablePivotCtrls, mesh, camCtrlRef, camRotatingFlag}: 
+export function HTMLSBMesh({enablePivotCtrls, sbmesh, children
+}: 
     { enablePivotCtrls: boolean, 
-    mesh: THREE.Mesh,
-    camCtrlRef: React.RefObject<OrbitControlsImpl | null>, 
-    camRotatingFlag: boolean })
+    sbmesh: SBMesh,
+    children: React.ReactNode })
 {
     const [isHovered, setHovered] = useState(false)
     const uOutlineAlphaRef = useRef({ value: 0 }); // Initial alpha
     const selectedModel = useSelectModelStore((state:any) => state.selectedModel);
     const setSelectedModel = useSelectModelStore((model:any) => model.setSelectedModel);
     const mouseDownPos = useRef<{ x: number; y: number }>({x:-1, y:-1});
+    const actorVisibility = !sbmesh.useHiddenStore((state:any)=>state.hidden)
+
+    const camCtrl = useCameraCtrlStore((state:any) => state.orbitalCameraCtrl) as OrbitControlsImpl
+    const camRotatingFlag = useCameraCtrlStore((state:any) => state.orbitalCameraRotatingFlag)
+
+    if(!sbmesh)
+    {
+        return
+    }
+
+    const mesh = sbmesh.object as THREE.Mesh
+    if(!mesh)
+    {
+        return
+    }
+        
     
     const outlineMaterial = useMemo(() => 
         InvertedHullMaterial.clone(), [InvertedHullMaterial]);
     const outlineMesh = useMemo(() => CloneMesh(mesh, false), [mesh]);
     
     useEffect(() => 
+    {
+        if(Array.isArray(outlineMesh.material))
         {
-            if(Array.isArray(outlineMesh.material))
-            {
-                // Replace or modify the material
-                outlineMesh.material.fill(outlineMaterial)
-            }
-            else if(outlineMesh.material)
-            {
-                // Replace or modify the material
-                outlineMesh.material = outlineMaterial
-            }
-                    
-        }, [outlineMesh])
+            // Replace or modify the material
+            outlineMesh.material.fill(outlineMaterial)
+        }
+        else if(outlineMesh.material)
+        {
+            // Replace or modify the material
+            outlineMesh.material = outlineMaterial
+        }
+                
+    }, [outlineMesh])
 
     useFrame((state, delta) => 
     { 
@@ -219,26 +246,31 @@ export function SBModelComponent({enablePivotCtrls, mesh, camCtrlRef, camRotatin
         .uniforms.uOutlineAlpha.value = uOutlineAlphaRef.current.value;
     });
 
-    
-
     return(
         <>
             <PivotControls
             enabled={enablePivotCtrls && (selectedModel==mesh)}
-            
+            autoTransform={false}
+            matrix={mesh.matrix}
             onDragStart={() => 
             {
-                if(camCtrlRef.current)
+                if(camCtrl)
                 {
-                    camCtrlRef.current.enabled = false
+                    camCtrl.enabled = false
                 }
+            }}
+            onDrag={(matrix)=>
+            {
+                mesh.matrix.copy(matrix)
+                mesh.updateMatrixWorld(true)
             }}
             onDragEnd={() => 
             {
-                if(camCtrlRef.current)
+                if(camCtrl)
                 {
-                    camCtrlRef.current.enabled = true
+                    camCtrl.enabled = true
                 }
+                    
             }}>
                 <group>
                     {/* We will use this to create a low-poly hitbox for the model for cursor
@@ -305,18 +337,20 @@ export function SBModelComponent({enablePivotCtrls, mesh, camCtrlRef, camRotatin
                         <mesh uuid={mesh.uuid}
                                 geometry={mesh.geometry}
                                 material={mesh.material}
-                                matrix={mesh.matrixWorld}
-                                matrixAutoUpdate={false}>
+                                visible={actorVisibility}
+                                >
                         </mesh>
 
                         <mesh uuid={outlineMesh.uuid}
                                 geometry={outlineMesh.geometry}
                                 material={outlineMesh.material}
-                                matrix={outlineMesh.matrixWorld}
-                                matrixAutoUpdate={false}>
+                                visible={actorVisibility}
+                                >
                         </mesh>
                     </group>
                 </group>
+
+                {children}
                 
             </PivotControls>
         </>

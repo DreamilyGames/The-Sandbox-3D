@@ -1,13 +1,13 @@
-import React, { useRef, useState, Component, Suspense, type Dispatch, type SetStateAction, useEffect, type MouseEventHandler, useMemo } from 'react'
+import React, { useRef, useState, Component, type Dispatch, type SetStateAction, useEffect, type MouseEventHandler, useMemo, type ChangeEvent, Suspense } from 'react'
 import * as THREE from 'three'
 import { OrbitControls, Html, useProgress, Grid, useGLTF, Environment } from '@react-three/drei'
 import { Canvas, useFrame, type ThreeElements, type ThreeEvent
  } from '@react-three/fiber'
 import './index.css'
 import './SBSandbox.css'
-import { useSelectModelStore } from './World/SBWorld'
-import {SBModel} from './Actor/Model/SBModel'
-import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
+import { useSelectModelStore, type SBWorld } from './World/SBWorld'
+import {SBActor} from './Actor/SBActor'
+import { GLTFLoader, type OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import {v4 as uuidv4} from 'uuid';
 import { SBSceneGraphNode } from './UI/SBSceneGraphNode'
 import { SBThreeJSTexturePreview } from './UI/SBThreeJSTexturePreview'
@@ -17,82 +17,89 @@ import { SBDraggableOutliner } from './UI/SBDraggableContainer'
 import { GetTailwindColor } from './UI/SBTailwindCSSReader'
 import { SBSlider } from './UI/SBSlider'
 import { inspectMaterialSchema, updateMaterialProperty } from './Renderer/Material/SBMaterialProperties'
+import { SBSaveButton } from './UI/SBSaveButton'
+import { SBLoadButton } from './UI/SBLoadButton'
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js'
+import { useCameraCtrlStore } from './World/SBCamera'
+import HTMLSBWorldDrawer from './World/SBWorldDrawer'
+import { useWorldStore, type WorldStoreState } from "./World/SBWorldStore"
 
-function Box(props: ThreeElements['mesh']) 
+type SaveFilePickerWindow = Window & 
 {
-    const meshRef = useRef<THREE.Mesh>(null!)
-    const [hovered, setHover] = useState(false)
-    const [active, setActive] = useState(false)
-    useFrame((state, delta) => (meshRef.current.rotation.x += delta))
-
-    return (
-        <mesh { ...props } ref = { meshRef } scale = { active? 1.5: 1 }
-            onClick = 
-            {(event) => 
-                setActive(!active)
-            }
-            onPointerOver = 
-            {
-                (event) => setHover(true)
-            }
-            onPointerOut = 
-            {
-                (event) => setHover(false)
-            }>
-
-            <boxGeometry args={ [0.5, 0.5, 0.5] } />
-            <meshStandardMaterial color = { hovered? 'hotpink': '#2f74c0' } />
-
-        </mesh>
-    )
+    showSaveFilePicker?: (options: {
+        suggestedName: string;
+        types: { description: string; accept: Record<string, string[]> }[];
+    }) => Promise<{
+        createWritable: () => Promise<{
+            write: (data: Blob) => Promise<void>;
+            close: () => Promise<void>;
+        }>;
+    }>;
 }
 
-function Bike({ camCtrlRef, camRotatingFlag }: 
-    { camCtrlRef: React.RefObject<OrbitControlsImpl | null>, camRotatingFlag: boolean })
+function Loader() 
 {
-    return (
-        <SBModel enablePivotCtrls = {true} 
-        modelPath = {'/models/motorcycles/BMW/S1000 RR/scene.gltf'} 
-        camCtrlRef = {camCtrlRef}
-        camRotatingFlag = {camRotatingFlag}/>
-    )
-}
-
-function Loader() {
   const { progress } = useProgress()
   return (<Html center className="text-white font-mono">{progress.toFixed(0)}% loaded</Html>)
 }
 
-function FastCameraLogger({ textRef }: { textRef: React.RefObject<HTMLHeadingElement|null> }) {
-  useFrame(({ camera }) => {
-    if(textRef)
-    {
-        if (textRef.current) {
-        const { x, y, z } = camera.position;
-        textRef.current.innerText = `X: ${x.toFixed(2)} | Y: ${y.toFixed(2)} | Z: ${z.toFixed(2)}`
-        }
-    }
-    
-  })
-
-  return null
-}
-
 export default function Sandbox() 
 {
-
-    const cameraTextRef = useRef<HTMLHeadingElement>(null)
-    const [controlsRef, [rotatingFlag, setRotatingFlag]]
-    : [controlsRef: React.RefObject<OrbitControlsImpl | null>, [rotatingFlag: boolean, setRotatingFlag: Dispatch<SetStateAction<boolean>>]]
-    = [useRef<OrbitControlsImpl>(null), useState<boolean>(false)]
+    const setOrbitalCameraCtrl = useCameraCtrlStore((state:any) => state.setOrbitalCameraCtrl)
+    const setOrbitalCameraRotatingFlag = useCameraCtrlStore((state:any) => state.setOrbitalCameraRotatingFlag)
+    
     const selectedModel = useSelectModelStore((state:any) => state.selectedModel)
-    const selectModel = useSelectModelStore((state:any) => state.setSelectedModel)
+    const setSelectedModel = useSelectModelStore((state:any) => state.setSelectedModel)
     const [isOpen, setIsOpen] = useState(false)
 
+    const orbitalCameraCtrlRefCallback = (instance: OrbitControlsImpl | null)=>
+    {
+        if (instance) 
+        {
+            setOrbitalCameraCtrl(instance);
+        }
+    }
+
+    const tetmatString = () =>
+    {
+        let str = ""
+        if(!selectedModel)
+            return ""
+        const mat = (selectedModel as THREE.Mesh).matrixWorld
+        const matarr = mat.toArray()
+
+        for(let i = 0; i < matarr.length; ++i)
+        {
+            str += matarr[i].toFixed(2) + ", "
+            if ((i > 0) && ((i+1) % 4) === 0) 
+            {
+                str += "\n"
+            }
+        }
+        return str
+    }
+
+    const de_trs = () =>
+    {
+        if(!selectedModel)
+            return ""
+
+        const mat = (selectedModel as THREE.Mesh).matrixWorld
+        
+        const t = new THREE.Vector3()
+        const r = new THREE.Quaternion()
+        const s = new THREE.Vector3()
+
+        mat.decompose(t, r, s)
+
+        return `Translation: (${t.x.toFixed(2)}, ${t.y.toFixed(2)}, ${t.z.toFixed(2)})\nRotation: (${r.x.toFixed(2)}, ${r.y.toFixed(2)}, ${r.z.toFixed(2)}, ${r.w.toFixed(2)})\nScale: (${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`
+    }
+
     const schema = useMemo(() => {
-    if (!selectedModel) return [];
-    return inspectMaterialSchema(selectedModel.material);
-  }, [selectedModel])
+        return selectedModel
+            ? inspectMaterialSchema(selectedModel.material)
+            : []
+    }, [selectedModel])
 
     //Use this if a subscription to the selected model is needed in the future. 
     // Currently, it is not used.
@@ -108,26 +115,133 @@ export default function Sandbox()
         return () => unsubscribe() // Cleanup subscription on unmount
     }, [])*/
     
-    const gltf = useGLTF("/models/motorcycles/BMW/S1000 RR/scene.gltf")
+    const defaultGLTF = useGLTF("/models/motorcycles/BMW/S1000 RR/new_bike.glb")
+    const pivotTransformsRef = useRef(new Map<string, React.RefObject<THREE.Matrix4>>())
+    const gWorld = useWorldStore((state:WorldStoreState) => state.world)
+
+    useMemo(() => 
+    {
+        gWorld.SetScene(defaultGLTF.scene)
+    }, [])
+
+    const handleLoad = async (event: ChangeEvent<HTMLInputElement>) => 
+    {
+        const file = event.currentTarget.files?.[0];
+        event.currentTarget.value = '';
+        if (!file) return;
+    
+        if(file.name.endsWith('.gltf')) 
+        {
+          //gltf files are not supported yet because 
+          // reading them requires fetching the external resources 
+          // (textures, etc.) which is not implemented yet
+
+          alert('GLTF files are not supported yet. Please use GLB files.');
+          return;
+        }
+    
+        try {
+          const data = await file.arrayBuffer();
+          new GLTFLoader().parse(
+            data,
+            '',
+            (gltf) => {
+              gWorld.SetScene(gltf.scene)
+              pivotTransformsRef.current.clear()
+              useSelectModelStore.setState({ selectedModel: null })
+            },
+            (loadError) => {
+              
+              console.error('Failed to load glTF file:', loadError);
+            },
+          );
+        } catch (loadError) {
+          console.error('Failed to read glTF file:', loadError);
+        }
+    };
+
+    const handleSave = async () => {
+        const pickerWindow = window as SaveFilePickerWindow
+
+        try {
+            const fileHandlePromise = pickerWindow.showSaveFilePicker?.({
+                suggestedName: 'sandbox-scene.glb',
+                types: [{
+                    description: 'Binary glTF model',
+                    accept: { 'model/gltf-binary': ['.glb'] },
+                }],
+            })
+
+            if(!gWorld.threeScene)
+            {
+                alert('gWorld.threeScene is null')
+                return
+            }
+
+            const exporter = new GLTFExporter()
+            let result: ArrayBuffer
+            try {
+                result = await new Promise<ArrayBuffer>((resolve, reject) => {
+                    exporter.parse(
+                        gWorld.threeScene!,
+                        (output) => {
+                            if (output instanceof ArrayBuffer) {
+                                resolve(output)
+                            } else {
+                                reject(new Error('GLTFExporter did not return binary output'))
+                            }
+                        },
+                        reject,
+                        { binary: true },
+                    )
+                })
+            } catch (error) 
+            {
+                alert('Failed to export the GLB model')
+                return
+            }
+            const blob = new Blob([result], { type: 'model/gltf-binary' })
+
+            if (fileHandlePromise) {
+                const fileHandle = await fileHandlePromise
+                const writable = await fileHandle.createWritable()
+                await writable.write(blob)
+                await writable.close()
+            } else {
+                const url = URL.createObjectURL(blob)
+                const link = document.createElement('a')
+                link.href = url
+                link.download = 'sandbox-scene.glb'
+                link.click()
+                window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+            }
+        } catch (error) 
+        {
+            //if (error instanceof DOMException && error.name === 'AbortError')
+                //alert('Failed to export the GLB model')
+        }
+    }
+
     return (
         <div className='flex h-screen w-screen overflow-hidden'>
 
-            <SBDraggableOutliner initialWidth={320} minWidth={240} maxWidth={520}>
+            <SBDraggableOutliner initialWidth={500} minWidth={240} maxWidth={600}>
                 {/* Scene Graph */}
                 <h1 className={`justify-start pl-3 
                     text-base border-b border-[var(--color-default-grey)]`}>
                     Scene
                 </h1>
 
-                {gltf.scene.children.map((child)=>
+                {gWorld.threeScene ? Array.from(gWorld.actors.entries()).map((child)=>
                 (
-                    <SBSceneGraphNode node={child} 
+                    <SBSceneGraphNode actor={child[1]} 
+                    key={child[0]}
                     selectedID={selectedModel ? (selectedModel as THREE.Object3D).uuid : null} 
                     onSelect={(obj)=>
                     {
-                        selectModel(obj)
+                        setSelectedModel(obj)
                     }} />
-                ))}
+                )) : (<></>)}
             </SBDraggableOutliner>
             
 
@@ -148,7 +262,8 @@ export default function Sandbox()
                     }}>
 
                         {/* 
-                            Preset options: 'city', 'night', 'park', 'studio', 'sunset', 'dawn', 'forest', 'apartment', 'warehouse'
+                            Preset options: 'city', 'night', 'park', 'studio', 'sunset', 'dawn', 
+                            'forest', 'apartment', 'warehouse'
                             - background: Renders the skybox in the 3D background
                         */}
                     <Environment preset="apartment" background/>
@@ -168,32 +283,43 @@ export default function Sandbox()
                         infiniteGrid                  // Extends grid endlessly
                     />
 
-                    {/*<Box position={[-1.2, 0, 0]} />
-                    <Box position={[1.2, 0, 0]} />*/}
-
-                    <Suspense fallback={<Loader />}>
-                        <Bike camCtrlRef={controlsRef} camRotatingFlag={rotatingFlag} />
+                    <Suspense fallback={<Loader/>}>
+                        <HTMLSBWorldDrawer 
+                        enablePivotCtrls={true}/>
                     </Suspense>
 
-                    <OrbitControls ref={controlsRef}
+                    <OrbitControls ref={orbitalCameraCtrlRefCallback}
                     onStart= {() =>
                     {
-                        setRotatingFlag(true)
+                        setOrbitalCameraRotatingFlag(true)
                     }}
                     onEnd= {() =>
                     {
-                        setRotatingFlag(false)
+                        setOrbitalCameraRotatingFlag(false)
                     }}/>
-
-                    <FastCameraLogger textRef={cameraTextRef} />
                 </Canvas>
 
-                {/* UI components 
-                    <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, color: 'white' }}>
-                        <h1 ref={cameraTextRef}></h1>
-                    </div>
-                */}
+                {/* UI components */}
+                <div className="absolute top-4 left-4 flex items-center gap-2 text-white font-mono 
+                text-xs bg-none p-2 rounded">
+                    <SBLoadButton
+                        className="bg-slate-800/60"
+                        onClick={handleLoad}
+                    />
+                    <SBSaveButton 
+                        className="bg-slate-800/60" 
+                        onClick={() => { void handleSave() }} 
+                    />
 
+                    <p className="whitespace-pre-wrap">
+                        {tetmatString()}
+                    </p>
+
+                    <p className="whitespace-pre-wrap">
+                        {de_trs()}
+                    </p>
+                </div>
+                    
                 {/* Property Panel */}  
                 <div className={`absolute inset-y-10 -right-100 w-90 h-9/10 p-4 overflow-y-auto
                 bg-[var(--color-default-black)] backdrop-blur-md opacity-90 border-4 
@@ -226,10 +352,11 @@ export default function Sandbox()
                     {/* Node Content */}
                     {(isOpen && selectedModel) && (
 
-                        <div className="">
+                        <div key={selectedModel.uuid} className="">
                         {schema.map((field) => {
                             if (field.type === 'color') {
                             return <SBColorPicker
+                            key={field.key}
                             defaultColor={field.value}
                             onChange={(newColor: string)=>
                             {
@@ -242,6 +369,7 @@ export default function Sandbox()
                             if (field.type === 'number') {
                             return (
                                 <SBSlider
+                                key={field.key}
                                 defaultValue={field.value}
                                 onChange={(newValue: number) => 
                                 {
@@ -258,50 +386,54 @@ export default function Sandbox()
 
                             if (field.type === 'boolean') {
                             return (
-                                <div key={field.key} className="flex justify-between items-center p-2 bg-slate-900 rounded border border-slate-800">
-                                <span className="text-xs text-slate-300">{field.label}</span>
-                                <input
-                                    type="checkbox"
-                                    defaultChecked={Boolean(field.value)}
-                                    onChange={(e) => {
-                                    updateMaterialProperty(selectedModel.material, field, e.target.checked);
-                                    }}
-                                    className="w-4 h-4 accent-sky-500 cursor-pointer"
-                                />
+                                <div key={field.key} className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-medium text-slate-300">{field.label}</span>
+                                        <input
+                                            type="checkbox"
+                                            defaultChecked={Boolean(field.value)}
+                                            onChange={(e) => {
+                                            updateMaterialProperty(selectedModel.material, field, e.target.checked);
+                                            }}
+                                            className="w-4 h-4 accent-sky-500 cursor-pointer rounded-lg"
+                                        />
+                                    </div>
                                 </div>
                             );
                             }
 
+                            if(field.type === 'select')
+                            {
+                                return (
+                                    <div key={field.key} className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-medium text-slate-300">{field.label}</span>
+                                            <select
+                                                defaultValue={field.value}
+                                                onChange={(e) => {
+                                                    const option = field.options?.find(
+                                                        ({ value }) => String(value) === e.target.value
+                                                    );
+                                                    if (option) {
+                                                        updateMaterialProperty(selectedModel.material, field, option.value);
+                                                    }
+                                                }}
+                                                className="bg-slate-800 rounded-lg text-slate-300 border border-slate-600 focus:ring-blue-500 focus:outline-none"
+                                            >
+                                                {field.options?.map((option) => (
+                                                    <option key={option.value} value={option.value}
+                                                    className="text-right text-xs">
+                                                        {option.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                );
+                            }
+
                             return null;
                         })}
-
-                        {/*<div className="">
-                            <div className="border-l border-slate-800 ml-2 space-y-0.5">
-                                <SBThreeJSTexturePreview 
-                                texture={
-                                    ((selectedModel as THREE.Mesh).material as THREE.MeshPhysicalMaterial).map
-                                }>
-                                    Diffuse
-                                </SBThreeJSTexturePreview>
-
-                                <SBColorPicker propName={"color"} mesh={selectedModel}>
-                                    Diffuse     
-                                </SBColorPicker>
-                            </div>
-
-                            <div className="border-l border-slate-800 ml-2 space-y-0.5">
-                                <SBThreeJSTexturePreview 
-                                texture={
-                                    ((selectedModel as THREE.Mesh).material as THREE.MeshPhysicalMaterial).metalnessMap
-                                }>
-                                    Metalness
-                                </SBThreeJSTexturePreview>
-
-                                <SBSlider propName={"metalness"} mesh={selectedModel}>
-                                    Metalness     
-                                </SBSlider>
-                            </div>
-                        </div>*/}
                         </div>
                     )}
                     

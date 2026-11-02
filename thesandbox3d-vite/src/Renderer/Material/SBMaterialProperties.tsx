@@ -57,6 +57,7 @@ const EXCLUDED_KEYS = new Set([
   'stencilFuncMask',
   'transparent', //users dont need to see this, it is derived from opacity
   'alphaHash',
+  'side'
 ]);
 
 /** Standard PBR property range hints */
