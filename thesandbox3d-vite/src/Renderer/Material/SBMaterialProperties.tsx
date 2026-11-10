@@ -202,7 +202,7 @@ export function inspectMaterialSchema(
  * top-level properties or ShaderMaterial uniforms correctly.
  */
 export function updateMaterialProperty(
-  material: THREE.Material,
+  material: THREE.Material | THREE.Material[],
   field: MaterialFieldSchema,
   newValue: any
 ) {

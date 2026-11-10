@@ -22,12 +22,12 @@ if (import.meta.hot)
   import.meta.hot.data.worldInstance = worldInstance;
 }
 
-export interface WorldStoreState 
+export interface SBWorldStoreState 
 {
   world: SBWorld;
 }
 
-export const useWorldStore = create<WorldStoreState>()
+export const useWorldStore = create<SBWorldStoreState>()
 (
     subscribeWithSelector((set) => 
     ({

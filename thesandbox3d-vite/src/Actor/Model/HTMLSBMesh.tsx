@@ -2,178 +2,18 @@
 import { PivotControls } from '@react-three/drei'
 import  { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { type OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import { MeshoptSimplifier } from 'meshoptimizer'
-import { useEffect, useMemo, useRef, useState } from 'react';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three'
 import { easing } from 'maath'
-import {useSelectModelStore} from '../../World/SBWorld'
+import {useSelectActorStore} from '../../World/SBWorld'
 import {v4 as uuidv4} from 'uuid';
 import { SBActor } from '../SBActor';
 import { useCameraCtrlStore } from '../../World/SBCamera';
 import { SBMesh } from './SBMesh';
-
-/**
- * Clone a THREE.Mesh. Optionally includes its geometries and materials
- * to ensure that the original model remains unaltered if requested.
- * @param mesh - Target mesh
- * @param deepClone - Whether to perform a deep clone of the mesh (default: true).
- * @param cloneGeometriesAndMaterials - Whether to clone geometries and materials (default: false).
- * @returns The cloned 3D mesh
- */
-export function CloneMesh(mesh: THREE.Mesh, 
-    deepClone: boolean = true,
-    cloneGeometriesAndMaterials: boolean = false): THREE.Mesh
-{
-    const clonedMesh = mesh.clone(deepClone)
-
-    if(cloneGeometriesAndMaterials)
-    {
-        // Traverse and clone individual geometries/index buffers
-        // Clone the geometry so vertex and index buffers are detached
-        clonedMesh.geometry = mesh.geometry.clone()
-        clonedMesh.matrixWorld = mesh.matrixWorld.clone()
-
-        //Independent material instances
-        if (Array.isArray(mesh.material)) 
-        {
-            clonedMesh.material = mesh.material.map((mat) => mat.clone());
-        } 
-        else if (mesh.material) 
-        {
-            clonedMesh.material = mesh.material.clone();
-        }
-    }
-
-    return clonedMesh;
-}
-
-/**
- * The properties of the SimplifiedMesh component.
- */
-interface SimplifiedMeshProps extends React.ComponentPropsWithoutRef<'primitive'> 
-{
-  mesh: THREE.Mesh // The 3D mesh to simplify
-  vertRetain: number // The percentage of vertices to retain (between 0 and 1)
-}
-
-/**
- * Simplifies a 3D model by reducing its vertex count and applying flat shading.
- * @param mesh - The 3D mesh to simplify.
- * @param vertRetain - The percentage of vertices to retain (between 0 and 1). 
- * @returns A DOM object ready for rendering in a React Three Fiber scene
- */
-function SimplifiedMesh({ mesh, vertRetain, ...props }: 
-    SimplifiedMeshProps) 
-{
-  const lowPolyMesh = useMemo(() => 
-  {
-    // Deep clone to avoid mutating the original
-    const clonedMesh = CloneMesh(mesh, true, true) 
-
-    const asyncFunc = async () =>
-    {
-        const geometry = clonedMesh.geometry;
-        const positionAttribute = geometry.attributes.position;
-        const indexAttribute = geometry.index;
-
-        if (!indexAttribute) 
-        {
-            console.error('Geometry must be indexed to simplify.');
-            return;
-        }
-
-        // Extract raw typed arrays and normalize them to the types expected by meshoptimizer.
-        const vertices = positionAttribute.array instanceof Float32Array
-          ? positionAttribute.array
-          : new Float32Array(positionAttribute.array.buffer, 
-            positionAttribute.array.byteOffset, 
-            positionAttribute.array.byteLength / Float32Array.BYTES_PER_ELEMENT);
-        const indices = indexAttribute.array instanceof Uint32Array
-          ? indexAttribute.array
-          : new Uint32Array(indexAttribute.array.buffer, 
-            indexAttribute.array.byteOffset, 
-            indexAttribute.array.byteLength / Uint32Array.BYTES_PER_ELEMENT);
-        const indexCount = indices.length
-        const vertexStride = 3; // x, y, z
-        const targetIdxCount = Math.max(6, Math.floor(indexCount * vertRetain))
-        const targetIdxCountMultiplesOf3 = 
-        targetIdxCount - (targetIdxCount % 3); // Ensure count is a multiple of 3
-
-        // Wait for module initialization if your meshoptimizer wrapper requires it:
-        await MeshoptSimplifier.ready;
-
-        // Call the simplifier
-        // Returns a new Uint32Array containing the simplified indices
-        const simplifiedIndices = MeshoptSimplifier.simplify(
-            indices,
-            vertices,
-            vertexStride,
-            targetIdxCountMultiplesOf3,
-            0.1
-        )
-
-        // Update Three.js geometry index
-        geometry.setIndex(new THREE.Uint32BufferAttribute(
-            simplifiedIndices[0], 1));
-        const geometryIndex = geometry.index;
-        if (geometryIndex) {
-          geometryIndex.needsUpdate = true;
-        }
-        
-        // For Debug only
-        // Compute flat normals for classic low-poly faceted look
-        /**clonedMesh.geometry.computeVertexNormals();
-        if (clonedMesh.material) 
-        {
-          (clonedMesh.material as THREE.MeshStandardMaterial).flatShading = true;
-          (clonedMesh.material as THREE.MeshStandardMaterial).needsUpdate = true;
-        }**/
-    }
-
-    try
-    {
-        asyncFunc()
-    }
-    catch(e)
-    {
-
-    }
-
-    return clonedMesh;
-
-  }, 
-  [mesh]);
-
-  return <mesh uuid={lowPolyMesh.uuid} geometry={lowPolyMesh.geometry}
-  material={lowPolyMesh.material}
-  {...props}/>;
-}
-
-// An instance of a simple custom shader to create an inverted shell outline
-const InvertedHullMaterial = new THREE.ShaderMaterial({
-  uniforms: {
-    uOutlineColor: { value: new THREE.Color('cyan') },
-    uOutlineAlpha: { value: 0 }, // Animated alpha
-  },
-  vertexShader: `
-    const float cOutlineWidth = 0.01; // Default thickness
-    void main() {
-      // Scale vertex outward based on normal direction
-      vec3 newPosition = position + normal * cOutlineWidth;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
-    }
-  `,
-  fragmentShader: `
-    uniform vec3 uOutlineColor;
-    uniform float uOutlineAlpha;
-    void main() {
-      gl_FragColor = vec4(uOutlineColor * uOutlineAlpha, uOutlineAlpha);
-    }
-  `,
-  side: THREE.BackSide, // Render only inner faces
-  transparent: true,  // REQUIRED for smooth alpha fading
-  depthWrite: false,   // Prevents alpha z-buffer clipping artifacts
-});
+import { HTMLSimplifiedMesh } from './HTMLSBSimplifiedMesh';
+import { HTMLSBActor } from '../HTMLSBActor';
+import { useWorldStore, type SBWorldStoreState } from '../../World/SBWorldStore';
 
 /**
  * Constructs a 3D mesh object from a THREE.Mesh.
@@ -189,13 +29,13 @@ export function HTMLSBMesh({enablePivotCtrls, sbmesh, children
     children: React.ReactNode })
 {
     const [isHovered, setHovered] = useState(false)
+    const isHoveredNode = useSelectActorStore((state) => state.hoveredActor)
     const uOutlineAlphaRef = useRef({ value: 0 }); // Initial alpha
-    const selectedModel = useSelectModelStore((state:any) => state.selectedModel);
-    const setSelectedModel = useSelectModelStore((model:any) => model.setSelectedModel);
+    const selectedActor = useSelectActorStore((state) => state.selectedActor);
+    const setSelectedActor = useSelectActorStore((state) => state.setSelectedActor);
     const mouseDownPos = useRef<{ x: number; y: number }>({x:-1, y:-1});
     const actorVisibility = !sbmesh.useHiddenStore((state:any)=>state.hidden)
 
-    const camCtrl = useCameraCtrlStore((state:any) => state.orbitalCameraCtrl) as OrbitControlsImpl
     const camRotatingFlag = useCameraCtrlStore((state:any) => state.orbitalCameraRotatingFlag)
 
     if(!sbmesh)
@@ -208,11 +48,31 @@ export function HTMLSBMesh({enablePivotCtrls, sbmesh, children
     {
         return
     }
-        
+    
+
     
     const outlineMaterial = useMemo(() => 
-        InvertedHullMaterial.clone(), [InvertedHullMaterial]);
-    const outlineMesh = useMemo(() => CloneMesh(mesh, false), [mesh]);
+        sbmesh.InvertedHullMaterial.clone(), [sbmesh.InvertedHullMaterial]);
+    //const outlineMesh = useMemo(() => sbmesh.CloneMesh(false), [sbmesh]);
+
+    // HTMLSBActor now carries the mesh's source transform. Render shallow,
+    // identity-transform copies so the transform is not applied twice and R3F
+    // does not reparent the original mesh out of the imported data hierarchy.
+    // Geometry/material resources remain shared, so material editing still works.
+    const [displayMesh, outlineMesh] = useMemo(() =>
+    {
+        const meshes = [sbmesh.CloneMesh(false), sbmesh.CloneMesh(false)]
+        meshes.forEach((copy) =>
+        {
+            copy.matrixAutoUpdate = false
+            copy.matrix.identity()
+            copy.matrix.decompose(copy.position, copy.quaternion, copy.scale)
+            copy.matrixWorldNeedsUpdate = true
+        })
+        return meshes
+    }, [sbmesh]);
+
+    const gWorld = useWorldStore((state:SBWorldStoreState) => state.world)
     
     useEffect(() => 
     {
@@ -231,7 +91,7 @@ export function HTMLSBMesh({enablePivotCtrls, sbmesh, children
 
     useFrame((state, delta) => 
     { 
-        const targetAlpha = (isHovered || (selectedModel==mesh)) ? 1.0 : 0.0;
+        const targetAlpha = ((isHovered) || (selectedActor==sbmesh) || (isHoveredNode == sbmesh)) ? 1.0 : 0.0;
 
         easing.damp(
         uOutlineAlphaRef.current,
@@ -248,44 +108,20 @@ export function HTMLSBMesh({enablePivotCtrls, sbmesh, children
 
     return(
         <>
-            <PivotControls
-            enabled={enablePivotCtrls && (selectedModel==mesh)}
-            autoTransform={false}
-            matrix={mesh.matrix}
-            onDragStart={() => 
-            {
-                if(camCtrl)
-                {
-                    camCtrl.enabled = false
-                }
-            }}
-            onDrag={(matrix)=>
-            {
-                mesh.matrix.copy(matrix)
-                mesh.updateMatrixWorld(true)
-            }}
-            onDragEnd={() => 
-            {
-                if(camCtrl)
-                {
-                    camCtrl.enabled = true
-                }
-                    
-            }}>
+            <HTMLSBActor sbactor={sbmesh} drawPrimitive={false} enablePivotCtrls={enablePivotCtrls}>
                 <group>
                     {/* We will use this to create a low-poly hitbox for the model for cursor
                         detection in the future. */
-                    <SimplifiedMesh mesh={mesh} vertRetain={0.1} 
+                    <HTMLSimplifiedMesh mesh={sbmesh} vertRetain={0.1} 
                         onPointerOver = 
                         {(e: ThreeEvent<MouseEvent>) => 
                         {
                             e.stopPropagation()
-
+                            
                             if(!camRotatingFlag)
                             {
                                 setHovered(true)
                             }
-                            
                         }}
                         onPointerOut = 
                         {
@@ -314,14 +150,14 @@ export function HTMLSBMesh({enablePivotCtrls, sbmesh, children
                             }
                             else
                             {
-                                if(selectedModel == mesh)
+                                if(selectedActor == sbmesh)
                                 {
                                     //Deselect
-                                    setSelectedModel(null)
+                                    setSelectedActor(null)
                                 }
                                 else
                                 {
-                                    setSelectedModel(mesh)
+                                    setSelectedActor(sbmesh)
                                 }
                             }
                             
@@ -333,26 +169,15 @@ export function HTMLSBMesh({enablePivotCtrls, sbmesh, children
 
                     {/* The original (complex) model for display */}
                     <group raycast={() => null}>
+                        <primitive object={displayMesh} visible={actorVisibility} />
 
-                        <mesh uuid={mesh.uuid}
-                                geometry={mesh.geometry}
-                                material={mesh.material}
-                                visible={actorVisibility}
-                                >
-                        </mesh>
-
-                        <mesh uuid={outlineMesh.uuid}
-                                geometry={outlineMesh.geometry}
-                                material={outlineMesh.material}
-                                visible={actorVisibility}
-                                >
-                        </mesh>
+                        <primitive object={outlineMesh} visible={actorVisibility} />
                     </group>
                 </group>
 
                 {children}
                 
-            </PivotControls>
+            </HTMLSBActor>
         </>
     );
 }

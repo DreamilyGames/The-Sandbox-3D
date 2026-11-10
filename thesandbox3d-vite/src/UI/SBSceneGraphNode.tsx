@@ -3,34 +3,36 @@ import * as THREE from 'three'
 import { GetTailwindColor } from './SBTailwindCSSReader';
 import { Delete, Eye, EyeClosed, Save, Trash } from 'lucide-react';
 import { EMessageBoxSeverity, SBMessageBox } from './SBMessageBox';
-import { SBWorld } from '../World/SBWorld';
+import { SBWorld, useSelectActorStore } from '../World/SBWorld';
 import { SBActor } from '../Actor/SBActor';
 import { invalidate } from '@react-three/fiber';
-import { useWorldStore, type WorldStoreState } from "../World/SBWorldStore"
+import { useWorldStore, type SBWorldStoreState } from "../World/SBWorldStore"
 
 interface SBSceneGraphNodeProps
 {
   actor: SBActor;
-  selectedID: string | null;
-  onSelect: (object: THREE.Object3D | null) => void;
+  onSelect: (object: SBActor | null) => void;
+  onHover: (object: SBActor | null) => void;
 }
 
-export function SBSceneGraphNode({ actor, selectedID, onSelect }: SBSceneGraphNodeProps) 
+export function SBSceneGraphNode({ actor, onSelect, onHover }: SBSceneGraphNodeProps) 
 {
-  const actorObj3d = actor?.object
-  if(!actorObj3d)
+  if(!actor || !actor.object)
     return
 
+  const actorObj3d = actor.object
+
   const [isOpen, setIsOpen] = useState(true);
-  const isSelected = selectedID ? selectedID === actorObj3d.uuid : false;
-  const hasChildren = actorObj3d.children && actorObj3d.children.length > 0;
+  const selectedActor = useSelectActorStore((state) => state.selectedActor)
+  const isSelected = selectedActor ? selectedActor == actor : false
+  const hasChildren = actor.children && actor.children.size > 0;
 
   const [nodeNameEditable, setNodeNameEditable] = useState(false);
   const nodeNameSpanRef = useRef<HTMLSpanElement>(null);
   const [deletionMsgBoxShow, setDeletionMsgBoxShow] = useState(false)
   const actorHidden = actor.useHiddenStore((state:any)=>state.hidden)
 
-  const gWorld = useWorldStore((state:WorldStoreState) => state.world)
+  const gWorld = useWorldStore((state:SBWorldStoreState) => state.world)
 
   return (
     <div className="pl-3">
@@ -60,7 +62,9 @@ export function SBSceneGraphNode({ actor, selectedID, onSelect }: SBSceneGraphNo
 
       {/* Node Row */}
       <div
-        onClick={() => onSelect(actorObj3d)}
+        onClick={() => onSelect(actor)}
+        onMouseEnter={() => onHover(actor)}
+        onMouseLeave={() => onHover(null)}
         className={`flex items-center justify-between px-2 py-1 rounded text-xs cursor-pointer
           w-fit gap-4 ${
           isSelected ? 'bg-sky-600 text-white' : 'hover:bg-slate-800 text-slate-300'
@@ -134,7 +138,6 @@ export function SBSceneGraphNode({ actor, selectedID, onSelect }: SBSceneGraphNo
             {
                 e.stopPropagation();
                 actor.SetHidden(!actor.IsHidden())
-                //setActorHidden(actor.IsHidden())
             }}  
           >
             {actorHidden
@@ -157,12 +160,12 @@ export function SBSceneGraphNode({ actor, selectedID, onSelect }: SBSceneGraphNo
       {/* Recursive Render of Nested Children */}
       {hasChildren && isOpen && (
         <div className="border-l border-slate-800 ml-2 space-y-0.5">
-          {actorObj3d.children!.map((childNode) => (
+          {Array.from(actor.children!.values()).map((childNode) => (
             <SBSceneGraphNode
               key={childNode.uuid}
               actor={actor.children.get(childNode.uuid)!}
-              selectedID={selectedID}
               onSelect={onSelect}
+              onHover={onHover}
             />
           ))}
         </div>

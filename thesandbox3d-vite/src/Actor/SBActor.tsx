@@ -9,12 +9,15 @@ export interface ISBActor
     type: string
     children: Map<string, ISBActor>
     parent: ISBActor | null
+    childrenThreeGrp: THREE.Group | null
+    childrenThreePivotGrp: THREE.Group | null
     //DO NOT MODIFY the 'hidden' flag directly!
     useHiddenStore: any
 
     Dispose() : void
     SetHidden(flag: boolean) : void
     IsHidden() : boolean
+    CopyTransformFromChildrenGrp() : void
 }
 
 export class SBActor implements ISBActor
@@ -24,6 +27,8 @@ export class SBActor implements ISBActor
     type: string = ""
     children: Map<string, ISBActor> = new Map<string, ISBActor>
     parent: ISBActor | null = null
+    childrenThreeGrp: THREE.Group | null = null
+    childrenThreePivotGrp: THREE.Group | null = null
 
     useHiddenStore = create<{hidden: boolean, setHidden: (flag:boolean)=>void}>()(
         persist(
@@ -97,6 +102,42 @@ export class SBActor implements ISBActor
         if (this.object && this.object.parent) 
         {
            this.object.parent.remove(this.object);
+        }
+    }
+
+    CopyTransformFromChildrenGrp()
+    {
+        if(this.object && this.childrenThreeGrp)
+        {
+            if(this.object.name === "wheel_lrchild_79")
+            {
+                const strr = (mat: THREE.Matrix4) =>
+                {
+                    let str = ""
+                    const matarr = mat.toArray()
+
+                    for(let i = 0; i < matarr.length; ++i)
+                    {
+                        str += matarr[i].toFixed(2) + ", "
+                        if ((i > 0) && ((i+1) % 4) === 0) 
+                        {
+                            str += "\n"
+                        }
+                    }
+
+                    return str
+                }
+                
+
+                console.log(strr(this.object.matrix))
+                console.log(strr(this.object.matrixWorld))
+            }
+            
+            
+
+            this.object.matrixAutoUpdate = false
+            this.object.matrix.copy(this.object.matrix.multiply(this.childrenThreeGrp.matrix))
+            this.object.updateMatrixWorld(true)
         }
     }
 }

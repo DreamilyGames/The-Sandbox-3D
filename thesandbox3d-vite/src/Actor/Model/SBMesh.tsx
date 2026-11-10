@@ -3,6 +3,68 @@ import { SBActor } from '../SBActor';
 
 export class SBMesh extends SBActor
 {
+    // An instance of a simple custom shader to create an inverted shell outline
+    InvertedHullMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uOutlineColor: { value: new THREE.Color('cyan') },
+        uOutlineAlpha: { value: 0 }, // Animated alpha
+      },
+      vertexShader: `
+        const float cOutlineWidth = 0.01; // Default thickness
+        void main() {
+          // Scale vertex outward based on normal direction
+          vec3 newPosition = position + normal * cOutlineWidth;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uOutlineColor;
+        uniform float uOutlineAlpha;
+        void main() {
+          gl_FragColor = vec4(uOutlineColor * uOutlineAlpha, uOutlineAlpha);
+        }
+      `,
+      side: THREE.BackSide, // Render only inner faces
+      transparent: true,  // REQUIRED for smooth alpha fading
+      depthWrite: false,   // Prevents alpha z-buffer clipping artifacts
+    })
+
+    /**
+     * Clone the mesh. Optionally includes its geometries and materials
+     * to ensure that the original model remains unaltered if requested.
+     * @param mesh - Target mesh
+     * @param deepClone - Whether to perform a deep clone of the mesh (default: true).
+     * @param cloneGeometriesAndMaterials - Whether to clone geometries and materials (default: false).
+     * @returns The cloned 3D mesh
+     */
+    CloneMesh( 
+        deepClone: boolean = true,
+        cloneGeometriesAndMaterials: boolean = false): THREE.Mesh
+    {
+        const mesh = this.object as THREE.Mesh
+        const clonedMesh = mesh.clone(deepClone)
+    
+        if(cloneGeometriesAndMaterials)
+        {
+            // Traverse and clone individual geometries/index buffers
+            // Clone the geometry so vertex and index buffers are detached
+            clonedMesh.geometry = mesh.geometry.clone()
+            clonedMesh.matrixWorld = mesh.matrixWorld.clone()
+    
+            //Independent material instances
+            if (Array.isArray(mesh.material)) 
+            {
+                clonedMesh.material = mesh.material.map((mat) => mat.clone());
+            } 
+            else if (mesh.material) 
+            {
+                clonedMesh.material = mesh.material.clone();
+            }
+        }
+    
+        return clonedMesh;
+    }
+
     Dispose()
     {
         const mesh = this.object as THREE.Mesh

@@ -5,7 +5,7 @@ import { Canvas, useFrame, type ThreeElements, type ThreeEvent
  } from '@react-three/fiber'
 import './index.css'
 import './SBSandbox.css'
-import { useSelectModelStore, type SBWorld } from './World/SBWorld'
+import { useSelectActorStore, type SBWorld } from './World/SBWorld'
 import {SBActor} from './Actor/SBActor'
 import { GLTFLoader, type OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import {v4 as uuidv4} from 'uuid';
@@ -22,7 +22,10 @@ import { SBLoadButton } from './UI/SBLoadButton'
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js'
 import { useCameraCtrlStore } from './World/SBCamera'
 import HTMLSBWorldDrawer from './World/SBWorldDrawer'
-import { useWorldStore, type WorldStoreState } from "./World/SBWorldStore"
+import { useWorldStore, type SBWorldStoreState } from "./World/SBWorldStore"
+import { SBUndoButton } from './UI/SBUndoButton'
+import { SBRedoButton } from './UI/SBRedoButton'
+import { useCmdManagerStore } from './Core/Command/SBCommandManagerStore'
 
 type SaveFilePickerWindow = Window & 
 {
@@ -48,8 +51,12 @@ export default function Sandbox()
     const setOrbitalCameraCtrl = useCameraCtrlStore((state:any) => state.setOrbitalCameraCtrl)
     const setOrbitalCameraRotatingFlag = useCameraCtrlStore((state:any) => state.setOrbitalCameraRotatingFlag)
     
-    const selectedModel = useSelectModelStore((state:any) => state.selectedModel)
-    const setSelectedModel = useSelectModelStore((state:any) => state.setSelectedModel)
+    const selectedActor = useSelectActorStore((state) => state.selectedActor)
+    const setSelectedActor = useSelectActorStore((state) => state.setSelectedActor)
+
+    const hoveredActor = useSelectActorStore((state) => state.hoveredActor)
+    const setHoveredActor = useSelectActorStore((state) => state.setHoveredActor)
+
     const [isOpen, setIsOpen] = useState(false)
 
     const orbitalCameraCtrlRefCallback = (instance: OrbitControlsImpl | null)=>
@@ -60,31 +67,14 @@ export default function Sandbox()
         }
     }
 
-    const tetmatString = () =>
-    {
-        let str = ""
-        if(!selectedModel)
-            return ""
-        const mat = (selectedModel as THREE.Mesh).matrixWorld
-        const matarr = mat.toArray()
-
-        for(let i = 0; i < matarr.length; ++i)
-        {
-            str += matarr[i].toFixed(2) + ", "
-            if ((i > 0) && ((i+1) % 4) === 0) 
-            {
-                str += "\n"
-            }
-        }
-        return str
-    }
+    
 
     const de_trs = () =>
     {
-        if(!selectedModel)
+        if(!selectedActor || !selectedActor.object)
             return ""
 
-        const mat = (selectedModel as THREE.Mesh).matrixWorld
+        const mat = (selectedActor.object as THREE.Mesh).matrix
         
         const t = new THREE.Vector3()
         const r = new THREE.Quaternion()
@@ -96,10 +86,10 @@ export default function Sandbox()
     }
 
     const schema = useMemo(() => {
-        return selectedModel
-            ? inspectMaterialSchema(selectedModel.material)
+        return selectedActor && selectedActor.object
+            ? inspectMaterialSchema((selectedActor.object as THREE.Mesh).material)
             : []
-    }, [selectedModel])
+    }, [selectedActor])
 
     //Use this if a subscription to the selected model is needed in the future. 
     // Currently, it is not used.
@@ -117,7 +107,36 @@ export default function Sandbox()
     
     const defaultGLTF = useGLTF("/models/motorcycles/BMW/S1000 RR/new_bike.glb")
     const pivotTransformsRef = useRef(new Map<string, React.RefObject<THREE.Matrix4>>())
-    const gWorld = useWorldStore((state:WorldStoreState) => state.world)
+    const gWorld = useWorldStore((state:SBWorldStoreState) => state.world)
+
+    const cmdManager = useCmdManagerStore((state) => state.commandManager)
+
+    const [tetmatString, setTetmatString] = useState<string>("")
+    
+    
+
+    const updateTetmatString = () =>
+    {
+        let str = ""
+
+        const _actor = selectedActor
+        
+        if(!_actor || !_actor.object)
+            return ""
+        
+        const mat = (_actor.object as THREE.Mesh).matrix
+        const matarr = mat.toArray()
+
+        for(let i = 0; i < matarr.length; ++i)
+        {
+            str += matarr[i].toFixed(2) + ", "
+            if ((i > 0) && ((i+1) % 4) === 0) 
+            {
+                str += "\n"
+            }
+        }
+        return str
+    }
 
     useMemo(() => 
     {
@@ -148,7 +167,7 @@ export default function Sandbox()
             (gltf) => {
               gWorld.SetScene(gltf.scene)
               pivotTransformsRef.current.clear()
-              useSelectModelStore.setState({ selectedModel: null })
+              setSelectedActor(null)
             },
             (loadError) => {
               
@@ -183,7 +202,7 @@ export default function Sandbox()
             try {
                 result = await new Promise<ArrayBuffer>((resolve, reject) => {
                     exporter.parse(
-                        gWorld.threeScene!,
+                        gWorld.UpdateScene()!,
                         (output) => {
                             if (output instanceof ArrayBuffer) {
                                 resolve(output)
@@ -217,8 +236,8 @@ export default function Sandbox()
             }
         } catch (error) 
         {
-            //if (error instanceof DOMException && error.name === 'AbortError')
-                //alert('Failed to export the GLB model')
+            if (error instanceof DOMException && error.name === 'AbortError')
+                alert('Closed the save dialog without saving.')
         }
     }
 
@@ -236,11 +255,15 @@ export default function Sandbox()
                 (
                     <SBSceneGraphNode actor={child[1]} 
                     key={child[0]}
-                    selectedID={selectedModel ? (selectedModel as THREE.Object3D).uuid : null} 
                     onSelect={(obj)=>
                     {
-                        setSelectedModel(obj)
-                    }} />
+                        setSelectedActor(obj)
+                    }}
+                    onHover={(obj)=>
+                    {
+                        setHoveredActor(obj)
+                    }} 
+                    />
                 )) : (<></>)}
             </SBDraggableOutliner>
             
@@ -252,10 +275,10 @@ export default function Sandbox()
                     {
                         if(e.type === 'click')
                         {
-                            if(selectedModel)
+                            if(selectedActor)
                             {
                                 // Deselect when clicking on the canvas background
-                                useSelectModelStore.setState({ selectedModel: null })
+                                setSelectedActor(null)
                             }
                         }
                         
@@ -310,22 +333,37 @@ export default function Sandbox()
                         className="bg-slate-800/60" 
                         onClick={() => { void handleSave() }} 
                     />
+                    <SBUndoButton
+                        className="bg-slate-800/60"
+                        onClick={() => 
+                        {
+                            cmdManager.Undo()
+                        }}
+                    />
 
-                    <p className="whitespace-pre-wrap">
-                        {tetmatString()}
+                    <SBRedoButton
+                        className="bg-slate-800/60"
+                        onClick={() => 
+                        {
+                            cmdManager.Redo()
+                        }}
+                    />
+
+                    /*<p className="whitespace-pre-wrap">
+                        {updateTetmatString()}
                     </p>
 
                     <p className="whitespace-pre-wrap">
                         {de_trs()}
-                    </p>
+                    </p>*/
                 </div>
                     
                 {/* Property Panel */}  
                 <div className={`absolute inset-y-10 -right-100 w-90 h-9/10 p-4 overflow-y-auto
-                bg-[var(--color-default-black)] backdrop-blur-md opacity-90 border-4 
+                bg-[var(--color-default-black)] backdrop-blur-md opacity-0 border-4 
                 border-[var(--color-default-grey)] flex-1 justify-start
                 border-opacity-100 rounded-xl transition-transform ease-in-out
-                duration-100 ${selectedModel ? ' -translate-x-105' : ' translate-x-0'}`}>
+                duration-100 ${selectedActor ? ' -translate-x-105' : ' translate-x-0'} `}>
                     <div className="pl-0">
                 
                     {/* Node Row */}
@@ -350,9 +388,9 @@ export default function Sandbox()
                     </div>
                 
                     {/* Node Content */}
-                    {(isOpen && selectedModel) && (
+                    {(isOpen && selectedActor && selectedActor.object) && (
 
-                        <div key={selectedModel.uuid} className="">
+                        <div key={selectedActor.uuid} className="">
                         {schema.map((field) => {
                             if (field.type === 'color') {
                             return <SBColorPicker
@@ -360,7 +398,8 @@ export default function Sandbox()
                             defaultColor={field.value}
                             onChange={(newColor: string)=>
                             {
-                                updateMaterialProperty(selectedModel.material, field, newColor);
+                                updateMaterialProperty(
+                                    (selectedActor.object as THREE.Mesh).material, field, newColor);
                             }}>
                                         {field.label}
                                    </SBColorPicker>;
@@ -373,7 +412,8 @@ export default function Sandbox()
                                 defaultValue={field.value}
                                 onChange={(newValue: number) => 
                                 {
-                                    updateMaterialProperty(selectedModel.material, field, newValue);
+                                    updateMaterialProperty(
+                                        (selectedActor.object as THREE.Mesh).material, field, newValue);
                                 }}
                                 min={field.min}
                                 max={field.max}
@@ -393,7 +433,8 @@ export default function Sandbox()
                                             type="checkbox"
                                             defaultChecked={Boolean(field.value)}
                                             onChange={(e) => {
-                                            updateMaterialProperty(selectedModel.material, field, e.target.checked);
+                                            updateMaterialProperty(
+                                                (selectedActor.object as THREE.Mesh).material, field, e.target.checked);
                                             }}
                                             className="w-4 h-4 accent-sky-500 cursor-pointer rounded-lg"
                                         />
@@ -415,7 +456,8 @@ export default function Sandbox()
                                                         ({ value }) => String(value) === e.target.value
                                                     );
                                                     if (option) {
-                                                        updateMaterialProperty(selectedModel.material, field, option.value);
+                                                        updateMaterialProperty(
+                                                            (selectedActor.object as THREE.Mesh).material, field, option.value);
                                                     }
                                                 }}
                                                 className="bg-slate-800 rounded-lg text-slate-300 border border-slate-600 focus:ring-blue-500 focus:outline-none"

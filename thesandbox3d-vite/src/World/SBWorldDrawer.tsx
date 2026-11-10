@@ -3,7 +3,8 @@ import { HTMLSBMesh } from "../Actor/Model/HTMLSBMesh"
 import { SBActor } from "../Actor/SBActor"
 import { SBWorld } from "./SBWorld"
 import {v4 as uuidv4} from 'uuid'
-import { useWorldStore, type WorldStoreState } from "./SBWorldStore"
+import { useWorldStore, type SBWorldStoreState } from "./SBWorldStore"
+import { HTMLSBActor } from "../Actor/HTMLSBActor"
 
 export default function HTMLSBWorldDrawer({_actors, enablePivotCtrls}
     :
@@ -13,7 +14,7 @@ export default function HTMLSBWorldDrawer({_actors, enablePivotCtrls}
     }
 )
 {
-    const gWorld = useWorldStore((state:WorldStoreState)=>state.world)
+    const gWorld = useWorldStore((state:SBWorldStoreState)=>state.world)
     const actors = _actors ? _actors : gWorld.actors
 
     if(!actors || actors.size === 0)
@@ -28,15 +29,15 @@ export default function HTMLSBWorldDrawer({_actors, enablePivotCtrls}
             const actor = child[1]
             if(!actor.object)
                 return
-
+            
             if(actor.type === "actor")
             {
-                return <primitive object={actor.object} key={child[0]}>
-                            {actor.children.size > 0 && <HTMLSBWorldDrawer _actors={actor.children}
+                return <HTMLSBActor sbactor={actor} enablePivotCtrls={enablePivotCtrls} key={child[0]} 
+                drawPrimitive={true}>
+                    {actor.children.size > 0 && <HTMLSBWorldDrawer _actors={actor.children}
                             enablePivotCtrls={enablePivotCtrls}
-                            key={uuidv4()}
                             />}
-                        </primitive>
+                    </HTMLSBActor>
             }
             else if(actor.type === "mesh")
             {
@@ -46,7 +47,6 @@ export default function HTMLSBWorldDrawer({_actors, enablePivotCtrls}
 
                             {actor.children.size > 0 && <HTMLSBWorldDrawer _actors={actor.children}
                             enablePivotCtrls={enablePivotCtrls}
-                            key={uuidv4()}
                             />}
 
                         </HTMLSBMesh>
