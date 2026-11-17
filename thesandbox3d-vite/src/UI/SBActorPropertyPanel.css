@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+@theme
+{
+    --actor-prop-panel-top: 190px;
+}

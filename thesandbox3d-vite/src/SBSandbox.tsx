@@ -26,6 +26,8 @@ import { useWorldStore, type SBWorldStoreState } from "./World/SBWorldStore"
 import { SBUndoButton } from './UI/SBUndoButton'
 import { SBRedoButton } from './UI/SBRedoButton'
 import { useCmdManagerStore } from './Core/Command/SBCommandManagerStore'
+import { SBAboutCreator } from './UI/SBAboutCreator'
+import SBActorPropertyPanel from './UI/SBActorPropertyPanel'
 
 type SaveFilePickerWindow = Window & 
 {
@@ -322,6 +324,8 @@ export default function Sandbox()
                     }}/>
                 </Canvas>
 
+                <SBAboutCreator />
+
                 {/* UI components */}
                 <div className="absolute top-4 left-4 flex items-center gap-2 text-white font-mono 
                 text-xs bg-none p-2 rounded">
@@ -349,139 +353,17 @@ export default function Sandbox()
                         }}
                     />
 
-                    /*<p className="whitespace-pre-wrap">
+                   {/**<p className="whitespace-pre-wrap">
                         {updateTetmatString()}
                     </p>
 
                     <p className="whitespace-pre-wrap">
                         {de_trs()}
-                    </p>*/
+                    </p>**/}
                 </div>
                     
-                {/* Property Panel */}  
-                <div className={`absolute inset-y-10 -right-100 w-90 h-9/10 p-4 overflow-y-auto
-                bg-[var(--color-default-black)] backdrop-blur-md opacity-0 border-4 
-                border-[var(--color-default-grey)] flex-1 justify-start
-                border-opacity-100 rounded-xl transition-transform ease-in-out
-                duration-100 ${selectedActor ? ' -translate-x-105' : ' translate-x-0'} `}>
-                    <div className="pl-0">
                 
-                    {/* Node Row */}
-                    <div
-                    onClick={() => setIsOpen(!isOpen)}
-                    className={`flex items-center justify-between px-2 py-1 rounded text-xs cursor-pointer 
-                        hover:bg-slate-800 text-slate-300
-                    }`}
-                    >
-                    <div className="flex items-center space-x-1.5 truncate">
-                        <button
-                            onClick={(e) => {
-                            e.stopPropagation();
-                            setIsOpen(!isOpen);
-                            }}
-                            className="w-3 text-slate-400 hover:text-white"
-                        >
-                            {isOpen ? '▼' : '▶'}
-                        </button>
-                        <span className="truncate">Materials</span>
-                    </div>
-                    </div>
-                
-                    {/* Node Content */}
-                    {(isOpen && selectedActor && selectedActor.object) && (
-
-                        <div key={selectedActor.uuid} className="">
-                        {schema.map((field) => {
-                            if (field.type === 'color') {
-                            return <SBColorPicker
-                            key={field.key}
-                            defaultColor={field.value}
-                            onChange={(newColor: string)=>
-                            {
-                                updateMaterialProperty(
-                                    (selectedActor.object as THREE.Mesh).material, field, newColor);
-                            }}>
-                                        {field.label}
-                                   </SBColorPicker>;
-                            }
-
-                            if (field.type === 'number') {
-                            return (
-                                <SBSlider
-                                key={field.key}
-                                defaultValue={field.value}
-                                onChange={(newValue: number) => 
-                                {
-                                    updateMaterialProperty(
-                                        (selectedActor.object as THREE.Mesh).material, field, newValue);
-                                }}
-                                min={field.min}
-                                max={field.max}
-                                step={field.step}
-                                >
-                                    {field.label}
-                                </SBSlider>
-                            );
-                            }
-
-                            if (field.type === 'boolean') {
-                            return (
-                                <div key={field.key} className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-medium text-slate-300">{field.label}</span>
-                                        <input
-                                            type="checkbox"
-                                            defaultChecked={Boolean(field.value)}
-                                            onChange={(e) => {
-                                            updateMaterialProperty(
-                                                (selectedActor.object as THREE.Mesh).material, field, e.target.checked);
-                                            }}
-                                            className="w-4 h-4 accent-sky-500 cursor-pointer rounded-lg"
-                                        />
-                                    </div>
-                                </div>
-                            );
-                            }
-
-                            if(field.type === 'select')
-                            {
-                                return (
-                                    <div key={field.key} className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs font-medium text-slate-300">{field.label}</span>
-                                            <select
-                                                defaultValue={field.value}
-                                                onChange={(e) => {
-                                                    const option = field.options?.find(
-                                                        ({ value }) => String(value) === e.target.value
-                                                    );
-                                                    if (option) {
-                                                        updateMaterialProperty(
-                                                            (selectedActor.object as THREE.Mesh).material, field, option.value);
-                                                    }
-                                                }}
-                                                className="bg-slate-800 rounded-lg text-slate-300 border border-slate-600 focus:ring-blue-500 focus:outline-none"
-                                            >
-                                                {field.options?.map((option) => (
-                                                    <option key={option.value} value={option.value}
-                                                    className="text-right text-xs">
-                                                        {option.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-                                );
-                            }
-
-                            return null;
-                        })}
-                        </div>
-                    )}
-                    
-                </div>
-                </div>
-                
+                <SBActorPropertyPanel />
                 
 
             </main>

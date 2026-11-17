@@ -7,6 +7,8 @@ import { SBWorld, useSelectActorStore } from '../World/SBWorld';
 import { SBActor } from '../Actor/SBActor';
 import { invalidate } from '@react-three/fiber';
 import { useWorldStore, type SBWorldStoreState } from "../World/SBWorldStore"
+import { useCmdManagerStore } from '../Core/Command/SBCommandManagerStore';
+import { SBHideInEditorActorCommand } from '../Core/Command/Commands/SBHideInEditorActorCommand';
 
 interface SBSceneGraphNodeProps
 {
@@ -33,6 +35,7 @@ export function SBSceneGraphNode({ actor, onSelect, onHover }: SBSceneGraphNodeP
   const actorHidden = actor.useHiddenStore((state:any)=>state.hidden)
 
   const gWorld = useWorldStore((state:SBWorldStoreState) => state.world)
+  const gCmdManager = useCmdManagerStore((state) => state.commandManager)
 
   return (
     <div className="pl-3">
@@ -137,7 +140,10 @@ export function SBSceneGraphNode({ actor, onSelect, onHover }: SBSceneGraphNodeP
             onClick={(e)=>
             {
                 e.stopPropagation();
-                actor.SetHidden(!actor.IsHidden())
+
+                const hieCmd = new SBHideInEditorActorCommand(actor, !actor.IsHidden())
+                gCmdManager.Execute(hieCmd)
+                //actor.SetHidden(!actor.IsHidden())
             }}  
           >
             {actorHidden
